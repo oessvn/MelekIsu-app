@@ -9,6 +9,7 @@ export interface NewsItem {
     date: string;
     duration: string;
     likes: number;
+    image?: string;
     commentsList: { id: string; author: string; text: string }[];
 }
 
@@ -40,6 +41,7 @@ export const newsDatabase: NewsItem[] = [
         date: "18 Oktober 2025",
         duration: "4 Menit Baca",
         likes: 940,
+        image: "/images/petani.jpg",
         commentsList: [
             { id: "c2-1", author: "Ahmad Fauzi", text: "Alat sensornya bisa didapatkan di mana ya untuk kelompok tani?" }
         ]

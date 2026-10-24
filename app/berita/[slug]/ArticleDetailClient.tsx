@@ -106,8 +106,18 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
                         {articleData.title}
                     </h1>
 
-                    <div className="w-full h-64 sm:h-80 bg-gradient-to-tr from-[#F3D4c1] to-[#FFF8F5] rounded-xl flex items-center justify-center text-[#9B4000] shadow-inner">
-                        <span className="text-7xl">📰</span>
+                    <div className="w-full h-64 sm:h-80 relative rounded-xl overflow-hidden shadow-inner bg-[#F3D4c1]">
+                        {articleData.image ? (
+                            <img
+                                src={articleData.image}
+                                alt={articleData.title}
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-[#9B4000]">
+                                <span className="text-7xl">📰</span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="text-[#574238] text-sm sm:text-base leading-relaxed space-y-4 pt-2">

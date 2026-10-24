@@ -81,8 +81,8 @@ export default function BeritaPage() {
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
                                 className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap shadow-sm ${selectedCategory === cat
-                                        ? "bg-[#9B4000] text-white shadow-md"
-                                        : "bg-white text-[#574238] hover:bg-[#FFE3D1]"
+                                    ? "bg-[#9B4000] text-white shadow-md"
+                                    : "bg-white text-[#574238] hover:bg-[#FFE3D1]"
                                     }`}
                             >
                                 {cat}
@@ -119,9 +119,18 @@ export default function BeritaPage() {
                                 >
                                     <div>
                                         {/* Thumbnail */}
+                                        {/* Thumbnail */}
                                         <div className="relative h-48 bg-gradient-to-tr from-[#F3D4c1] to-[#FFF8F5] flex items-center justify-center text-[#9B4000] overflow-hidden">
-                                            <span className="text-4xl group-hover:scale-110 transition-transform duration-300">📄</span>
-                                            <div className="absolute top-3 left-3">
+                                            {article.image ? (
+                                                <img
+                                                    src={article.image}
+                                                    alt={article.title}
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                />
+                                            ) : (
+                                                <span className="text-4xl group-hover:scale-110 transition-transform duration-300">📄</span>
+                                            )}
+                                            <div className="absolute top-3 left-3 z-10">
                                                 <span className="bg-[#FDB659] text-[#724700] px-3 py-1 rounded-full text-[11px] font-bold uppercase shadow-xs">
                                                     {article.category}
                                                 </span>
@@ -203,8 +212,8 @@ export default function BeritaPage() {
                                             <button
                                                 onClick={() => handleToggleLike(article.id)}
                                                 className={`flex items-center gap-1.5 transition-all cursor-pointer px-2.5 py-1 rounded-full ${isLiked
-                                                        ? "bg-[#FFDDC9] text-[#9B4000] font-bold shadow-xs"
-                                                        : "hover:text-[#9B4000] text-[#574238]"
+                                                    ? "bg-[#FFDDC9] text-[#9B4000] font-bold shadow-xs"
+                                                    : "hover:text-[#9B4000] text-[#574238]"
                                                     }`}
                                                 title={isLiked ? "Batalkan Apresiasi" : "Beri Apresiasi"}
                                             >
