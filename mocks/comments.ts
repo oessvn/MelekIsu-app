@@ -1,0 +1,98 @@
+import { Comment } from "@/types/models";
+
+export const mockComments: Comment[] = [
+  {
+    id: "comment-1",
+    newsId: "news-1",
+    userId: "user-1",
+    content:
+      "Semoga MRT Fase 3 benar-benar selesai tepat waktu. Jakarta butuh transportasi publik yang terintegrasi untuk mengurangi kemacetan.",
+    status: "approved",
+    upvoteCount: 15,
+    upvotedBy: ["user-2", "user-3"],
+    createdAt: "2026-10-18T10:30:00Z",
+    updatedAt: "2026-10-18T10:30:00Z",
+  },
+  {
+    id: "comment-2",
+    newsId: "news-1",
+    userId: "user-2",
+    content:
+      "Bagaimana dengan nasib pedagang kaki lima di sekitar proyek pembangunan? Semoga ada solusi yang adil untuk mereka.",
+    status: "approved",
+    upvoteCount: 8,
+    upvotedBy: ["user-1"],
+    createdAt: "2026-10-18T11:00:00Z",
+    updatedAt: "2026-10-18T11:00:00Z",
+  },
+  {
+    id: "comment-3",
+    newsId: "news-1",
+    userId: "user-3",
+    content:
+      "Integrasi dengan TransJakarta dan KRL sangat penting. Selama ini berpindah moda transportasi masih ribet.",
+    status: "approved",
+    upvoteCount: 22,
+    upvotedBy: ["user-1", "user-2"],
+    createdAt: "2026-10-18T12:15:00Z",
+    updatedAt: "2026-10-18T12:15:00Z",
+  },
+  {
+    id: "comment-4",
+    newsId: "news-2",
+    userId: "user-1",
+    content:
+      "Program makan bergizi gratis ini sangat membantu. Anak saya di SD negeri sangat senang.",
+    status: "approved",
+    upvoteCount: 30,
+    upvotedBy: ["user-2", "user-3"],
+    createdAt: "2026-10-17T15:00:00Z",
+    updatedAt: "2026-10-17T15:00:00Z",
+  },
+  {
+    id: "comment-5",
+    newsId: "news-2",
+    userId: "user-3",
+    content: "Pengawasan kualitas makanan perlu diperketat.",
+    status: "pending",
+    upvoteCount: 0,
+    upvotedBy: [],
+    createdAt: "2026-10-17T16:00:00Z",
+    updatedAt: "2026-10-17T16:00:00Z",
+  },
+  {
+    id: "comment-6",
+    newsId: "news-3",
+    userId: "user-2",
+    content:
+      "50 taman baru? Luar biasa! Semoga perawatannya juga diperhatikan jangka panjang, jangan sampai taman baru tapi beberapa tahun kemudian terlantar.",
+    status: "approved",
+    upvoteCount: 11,
+    upvotedBy: ["user-1"],
+    createdAt: "2026-10-16T12:00:00Z",
+    updatedAt: "2026-10-16T12:00:00Z",
+  },
+  {
+    id: "comment-7",
+    newsId: "news-5",
+    userId: "user-1",
+    content:
+      "Akhirnya! Selama ini kalau anak sakit malam hari harus ke UGD rumah sakit. Puskesmas 24 jam sangat dibutuhkan.",
+    status: "approved",
+    upvoteCount: 45,
+    upvotedBy: ["user-2", "user-3"],
+    createdAt: "2026-10-14T17:00:00Z",
+    updatedAt: "2026-10-14T17:00:00Z",
+  },
+  {
+    id: "comment-8",
+    newsId: "news-5",
+    userId: "user-2",
+    content: "Spam iklan obat tidak resmi.",
+    status: "rejected",
+    upvoteCount: 0,
+    upvotedBy: [],
+    createdAt: "2026-10-14T18:00:00Z",
+    updatedAt: "2026-10-14T18:00:00Z",
+  },
+];
