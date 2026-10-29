@@ -3,46 +3,73 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, CheckCircle2, ArrowRight, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, CheckCircle2, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
     const router = useRouter();
+    const supabase = createClient();
 
-    const [emailOrPhone, setEmailOrPhone] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(true);
 
+    const [loading, setLoading] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMessage("");
 
-        if (!emailOrPhone || !password) {
-            setErrorMessage("Mohon masukkan email/nomor ponsel dan kata sandi Anda.");
+        if (!email || !password) {
+            setErrorMessage("Mohon masukkan email dan kata sandi Anda.");
             return;
         }
 
-        // Ambil database user dari localStorage
-        const existingUsers = JSON.parse(localStorage.getItem("nusantara_users") || "[]");
+        setLoading(true);
 
-        // Cari user yang cocok berdasarkan email/ponsel dan kata sandi
-        const foundUser = existingUsers.find(
-            (u: any) => u.emailOrPhone === emailOrPhone && u.password === password
-        );
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email.trim(),
+                password: password,
+            });
 
-        if (!foundUser) {
-            setErrorMessage("Akun tidak ditemukan atau kata sandi yang Anda masukkan salah.");
-            return;
+            if (error) {
+                if (error.message.includes("Invalid login credentials")) {
+                    setErrorMessage("Email atau kata sandi yang Anda masukkan salah.");
+                } else if (error.message.includes("Email not confirmed")) {
+                    setErrorMessage("Email belum dikonfirmasi. Silakan cek kotak masuk email Anda atau hubungi admin.");
+                } else {
+                    setErrorMessage(error.message);
+                }
+                return;
+            }
+
+            if (data.user) {
+                // Simpan cache profil user untuk sinkronisasi instan
+                const userProfile = {
+                    id: data.user.id,
+                    fullName: data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "Warga",
+                    emailOrPhone: data.user.email,
+                    role: data.user.user_metadata?.role || "Warga Terverifikasi Nusantara",
+                    joinedDate: new Date(data.user.created_at).toLocaleDateString("id-ID", { day: 'numeric', month: 'long', year: 'numeric' }),
+                };
+                localStorage.setItem("current_user", JSON.stringify(userProfile));
+                window.dispatchEvent(new Event("storage"));
+            }
+
+            setShowSuccessModal(true);
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setErrorMessage(err.message);
+            } else {
+                setErrorMessage("Terjadi kesalahan saat masuk. Silakan coba lagi.");
+            }
+        } finally {
+            setLoading(false);
         }
-
-        // Simpan sesi aktif ke localStorage
-        localStorage.setItem("current_user", JSON.stringify(foundUser));
-
-        // Tampilkan modal sukses
-        setShowSuccessModal(true);
     };
 
     return (
@@ -107,12 +134,13 @@ export default function LoginPage() {
                 {/* Form Input */}
                 <form onSubmit={handleLogin} className="flex flex-col gap-5">
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-[#28180C]">Alamat Email atau Nomor Ponsel Terdaftar</label>
+                        <label className="text-xs font-bold text-[#28180C]">Alamat Email</label>
                         <input
-                            type="text"
-                            value={emailOrPhone}
-                            onChange={(e) => setEmailOrPhone(e.target.value)}
-                            placeholder="nama@gmail.com atau 0812xxxxxxxx"
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="nama@gmail.com"
+                            required
                             className="px-4 py-3 bg-[#FFF1E9]/50 text-xs sm:text-sm rounded-xl border border-[#DEC0B3]/60 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#9B4000] transition-all"
                         />
                     </div>
@@ -125,6 +153,7 @@ export default function LoginPage() {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="Masukkan kata sandi akun"
+                                required
                                 className="w-full px-4 py-3 bg-[#FFF1E9]/50 text-xs sm:text-sm rounded-xl border border-[#DEC0B3]/60 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#9B4000] transition-all"
                             />
                             <button
@@ -164,10 +193,20 @@ export default function LoginPage() {
 
                     <button
                         type="submit"
-                        className="mt-2 w-full py-3.5 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-extrabold uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                        disabled={loading}
+                        className="mt-2 w-full py-3.5 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-extrabold uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                        <span>Masuk ke Portal Warga</span>
-                        <ArrowRight className="w-4 h-4" />
+                        {loading ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Memverifikasi Akun...</span>
+                            </>
+                        ) : (
+                            <>
+                                <span>Masuk ke Portal Warga</span>
+                                <ArrowRight className="w-4 h-4" />
+                            </>
+                        )}
                     </button>
                 </form>
 

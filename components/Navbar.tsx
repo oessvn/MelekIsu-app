@@ -12,6 +12,7 @@ import {
   User,
   Search,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const navLinks = [
   { href: "/", label: "Beranda", icon: null },
@@ -19,30 +20,96 @@ const navLinks = [
   { href: "/transparansi-aksi", label: "Transparansi Aksi", icon: AlertCircle },
 ];
 
+interface NavUserProfile {
+  id?: string;
+  fullName: string;
+  emailOrPhone?: string;
+  role?: string;
+  joinedDate?: string;
+}
+
+interface AuthUserLike {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    full_name?: string;
+    role?: string;
+  };
+  created_at?: string;
+}
+
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<NavUserProfile | null>(null);
   const router = useRouter();
 
-  // Cek sesi user yang sedang login secara real-time dari localStorage
+  // Sinkronisasi sesi user Supabase & localStorage secara real-time
   useEffect(() => {
-    const checkUserSession = () => {
-      const activeUser = localStorage.getItem("current_user");
-      if (activeUser) {
-        setCurrentUser(JSON.parse(activeUser));
-      } else {
-        setCurrentUser(null); // Set null jika sesi dihapus (logout)
-      }
+    const supabase = createClient();
+
+    const formatUserProfile = (authUser: AuthUserLike): NavUserProfile => {
+      return {
+        id: authUser.id,
+        fullName: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "Warga",
+        emailOrPhone: authUser.email,
+        role: authUser.user_metadata?.role || "Warga Terverifikasi",
+        joinedDate: authUser.created_at
+          ? new Date(authUser.created_at).toLocaleDateString("id-ID", { day: 'numeric', month: 'long', year: 'numeric' })
+          : "Terdaftar",
+      };
     };
 
-    // Cek saat pertama kali dimuat
-    checkUserSession();
+    // 1. Cek sesi user Supabase awal
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        const profile = formatUserProfile(user);
+        setCurrentUser(profile);
+        localStorage.setItem("current_user", JSON.stringify(profile));
+      } else {
+        const activeUser = localStorage.getItem("current_user");
+        if (activeUser) {
+          try {
+            setCurrentUser(JSON.parse(activeUser));
+          } catch {
+            setCurrentUser(null);
+          }
+        } else {
+          setCurrentUser(null);
+        }
+      }
+    });
 
-    // Dengarkan perubahan dari tab lain atau event logout manual
-    window.addEventListener("storage", checkUserSession);
+    // 2. Dengarkan perubahan status auth dari Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const profile = formatUserProfile(session.user);
+        setCurrentUser(profile);
+        localStorage.setItem("current_user", JSON.stringify(profile));
+      } else {
+        setCurrentUser(null);
+        localStorage.removeItem("current_user");
+      }
+    });
+
+    // 3. Dengarkan event storage untuk sinkronisasi antar tab
+    const handleStorage = () => {
+      const activeUser = localStorage.getItem("current_user");
+      if (activeUser) {
+        try {
+          setCurrentUser(JSON.parse(activeUser));
+        } catch {
+          setCurrentUser(null);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+
     return () => {
-      window.removeEventListener("storage", checkUserSession);
+      subscription.unsubscribe();
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 
@@ -125,11 +192,11 @@ export default function Navbar() {
               className="flex items-center gap-2 px-3 py-1.5 bg-[#FFF1E9] hover:bg-[#FFE5D4] text-[#9B4000] rounded-xl border border-[#DEC0B3]/60 transition-all shadow-2xs group"
             >
               <div className="w-7 h-7 rounded-full bg-[#9B4000] text-white flex items-center justify-center text-xs font-extrabold shadow-inner">
-                {currentUser.fullName.charAt(0).toUpperCase()}
+                {currentUser.fullName ? currentUser.fullName.charAt(0).toUpperCase() : "W"}
               </div>
               <div className="flex flex-col text-left">
                 <span className="text-xs font-extrabold text-[#28180C] group-hover:text-[#9B4000] transition-colors">
-                  {currentUser.fullName.split(" ")[0]}
+                  {currentUser.fullName ? currentUser.fullName.split(" ")[0] : "Warga"}
                 </span>
                 <span className="text-[9px] text-[#8B7266] uppercase font-bold tracking-tight">Warga</span>
               </div>
@@ -184,6 +251,7 @@ export default function Navbar() {
                   type="button"
                   onClick={handleClearSearch}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#9B4000] p-0.5 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Hapus pencarian"
                 >
                   <X className="h-4 w-4" />
                 </button>

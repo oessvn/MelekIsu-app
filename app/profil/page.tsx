@@ -3,33 +3,89 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { UserCheck, Mail, Calendar, Shield, LogOut, ArrowLeft, FileText, ThumbsUp } from "lucide-react";
+import { UserCheck, Mail, Calendar, Shield, LogOut, ArrowLeft, FileText, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+
+interface UserProfile {
+    id?: string;
+    fullName: string;
+    emailOrPhone: string;
+    role: string;
+    joinedDate: string;
+}
 
 export default function UserProfilePage() {
     const router = useRouter();
-    const [user, setUser] = useState<any>(null);
+    const [user, setUser] = useState<UserProfile | null>(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Ambil data user yang sedang aktif dari localStorage
-        const activeUser = localStorage.getItem("current_user");
-        if (!activeUser) {
-            // Jika belum daftar/login, arahkan kembali ke halaman daftar
-            router.push("/daftar");
-        } else {
-            setUser(JSON.parse(activeUser));
-        }
+        const supabase = createClient();
+        const fetchUserProfile = async () => {
+            try {
+                // 1. Cek sesi aktif langsung dari Supabase Auth
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+
+                if (authUser) {
+                    const profileData: UserProfile = {
+                        id: authUser.id,
+                        fullName: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "Warga Terdaftar",
+                        emailOrPhone: authUser.email || "-",
+                        role: authUser.user_metadata?.role || "Warga Terverifikasi Nusantara",
+                        joinedDate: authUser.created_at
+                            ? new Date(authUser.created_at).toLocaleDateString("id-ID", { day: 'numeric', month: 'long', year: 'numeric' })
+                            : "Terdaftar",
+                    };
+                    setUser(profileData);
+                    localStorage.setItem("current_user", JSON.stringify(profileData));
+                } else {
+                    // 2. Fallback cek ke localStorage jika sesi offline ada
+                    const activeUser = localStorage.getItem("current_user");
+                    if (activeUser) {
+                        setUser(JSON.parse(activeUser));
+                    } else {
+                        // Jika tidak ada user sama sekali, arahkan ke halaman masuk
+                        router.push("/masuk");
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.error("Gagal memuat profil pengguna:", err);
+                const activeUser = localStorage.getItem("current_user");
+                if (activeUser) {
+                    setUser(JSON.parse(activeUser));
+                } else {
+                    router.push("/masuk");
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchUserProfile();
     }, [router]);
 
-    const handleLogout = () => {
-        // 1. Hapus sesi aktif dari localStorage
-        localStorage.removeItem("current_user");
-
-        // 2. Kirim sinyal ke seluruh komponen bahwa user sudah logout
-        window.dispatchEvent(new Event("storage"));
-
-        // 3. Arahkan ke halaman beranda ("/") atau halaman masuk ("/masuk")
-        router.push("/");
+    const handleLogout = async () => {
+        const supabase = createClient();
+        try {
+            await supabase.auth.signOut();
+        } catch (err) {
+            console.error("Error signing out:", err);
+        } finally {
+            localStorage.removeItem("current_user");
+            window.dispatchEvent(new Event("storage"));
+            router.push("/masuk");
+        }
     };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-[#FFF8F5] text-[#28180C] flex flex-col items-center justify-center py-12 px-6">
+                <Loader2 className="w-8 h-8 text-[#9B4000] animate-spin mb-3" />
+                <p className="text-xs font-semibold text-[#8B7266]">Memuat profil warga...</p>
+            </div>
+        );
+    }
 
     if (!user) return null;
 
@@ -51,7 +107,7 @@ export default function UserProfilePage() {
                     {/* Header Identitas Profil */}
                     <div className="flex flex-col sm:flex-row items-center gap-6 border-b border-[#DEC0B3]/30 pb-8 text-center sm:text-left">
                         <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-[#FFDDC9] to-[#9B4000] text-white flex items-center justify-center text-3xl font-extrabold shadow-inner shrink-0">
-                            {user.fullName.charAt(0).toUpperCase()}
+                            {user.fullName ? user.fullName.charAt(0).toUpperCase() : "W"}
                         </div>
                         <div className="flex flex-col gap-1.5 flex-1">
                             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">

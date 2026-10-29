@@ -3,66 +3,92 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, CheckCircle2, ArrowRight, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, CheckCircle2, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function RegisterPage() {
     const router = useRouter();
+    const supabase = createClient();
 
     const [fullName, setFullName] = useState("");
-    const [emailOrPhone, setEmailOrPhone] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState(""); // State konfirmasi sandi
+    const [confirmPassword, setConfirmPassword] = useState("");
 
     const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false); // State toggle konfirmasi sandi
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const [agreed, setAgreed] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-    const handleRegister = (e: React.FormEvent) => {
+    const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
+        setErrorMessage("");
 
-        if (!fullName || !emailOrPhone || !password || !confirmPassword) {
-            alert("Mohon lengkapi seluruh kolom formulir terlebih dahulu.");
+        if (!fullName || !email || !password || !confirmPassword) {
+            setErrorMessage("Mohon lengkapi seluruh kolom formulir terlebih dahulu.");
             return;
         }
 
-        // Validasi apakah kata sandi dan konfirmasi sandi cocok
+        if (password.length < 6) {
+            setErrorMessage("Kata sandi minimal harus 6 karakter.");
+            return;
+        }
+
         if (password !== confirmPassword) {
-            alert("Kata sandi dan konfirmasi kata sandi tidak cocok. Silakan periksa kembali.");
+            setErrorMessage("Kata sandi dan konfirmasi kata sandi tidak cocok. Silakan periksa kembali.");
             return;
         }
 
         if (!agreed) {
-            alert("Anda harus menyetujui Pedoman Komunitas dan Kebijakan Privasi.");
+            setErrorMessage("Anda harus menyetujui Pedoman Komunitas dan Kebijakan Privasi.");
             return;
         }
 
-        // Buat objek profil pengguna baru
-        const newUser = {
-            fullName,
-            emailOrPhone,
-            password,
-            role: "Warga Terverifikasi Nusantara",
-            joinedDate: new Date().toLocaleDateString("id-ID", { day: 'numeric', month: 'long', year: 'numeric' }),
-        };
+        setLoading(true);
 
-        // Simpan ke localStorage sebagai database lokal & sesi aktif
-        const existingUsers = JSON.parse(localStorage.getItem("nusantara_users") || "[]");
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email: email.trim(),
+                password: password,
+                options: {
+                    data: {
+                        full_name: fullName.trim(),
+                        role: "Warga Terverifikasi Nusantara",
+                    },
+                },
+            });
 
-        const isRegistered = existingUsers.some((u: any) => u.emailOrPhone === emailOrPhone);
-        if (isRegistered) {
-            alert("Email atau nomor ponsel ini sudah terdaftar. Silakan gunakan akun lain atau masuk.");
-            return;
+            if (error) {
+                setErrorMessage(error.message);
+                return;
+            }
+
+            if (data.user) {
+                // Simpan juga salinan profil aktif agar kompatibel dengan komponen yang membaca localStorage
+                const userProfile = {
+                    id: data.user.id,
+                    fullName: fullName.trim(),
+                    emailOrPhone: email.trim(),
+                    role: "Warga Terverifikasi Nusantara",
+                    joinedDate: new Date().toLocaleDateString("id-ID", { day: 'numeric', month: 'long', year: 'numeric' }),
+                };
+                localStorage.setItem("current_user", JSON.stringify(userProfile));
+                window.dispatchEvent(new Event("storage"));
+            }
+
+            setShowSuccessModal(true);
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setErrorMessage(err.message);
+            } else {
+                setErrorMessage("Terjadi kesalahan saat mendaftar. Silakan coba lagi.");
+            }
+        } finally {
+            setLoading(false);
         }
-
-        existingUsers.push(newUser);
-        localStorage.setItem("nusantara_users", JSON.stringify(existingUsers));
-
-        // Set sesi user yang sedang aktif saat ini
-        localStorage.setItem("current_user", JSON.stringify(newUser));
-
-        setShowSuccessModal(true);
     };
 
     return (
@@ -78,7 +104,7 @@ export default function RegisterPage() {
                         <div className="space-y-1.5">
                             <h3 className="text-xl font-extrabold text-[#28180C]">Akun Berhasil Dibuat!</h3>
                             <p className="text-xs sm:text-sm text-[#574238] leading-relaxed">
-                                Selamat datang, <span className="font-bold text-[#9B4000]">{fullName}</span>. Akun warga berdaulat Anda telah aktif dan terverifikasi.
+                                Selamat datang, <span className="font-bold text-[#9B4000]">{fullName}</span>. Akun warga berdaulat Anda telah terdaftar dan terhubung ke database.
                             </p>
                         </div>
                         <button
@@ -116,6 +142,14 @@ export default function RegisterPage() {
                     </div>
                 </div>
 
+                {/* Notifikasi Error jika ada kendala */}
+                {errorMessage && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 p-3.5 rounded-xl text-xs flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{errorMessage}</span>
+                    </div>
+                )}
+
                 {/* Form Input */}
                 <form onSubmit={handleRegister} className="flex flex-col gap-5">
                     <div className="flex flex-col gap-1.5">
@@ -125,17 +159,19 @@ export default function RegisterPage() {
                             value={fullName}
                             onChange={(e) => setFullName(e.target.value)}
                             placeholder="Masukkan nama lengkap Anda"
+                            required
                             className="px-4 py-3 bg-[#FFF1E9]/50 text-xs sm:text-sm rounded-xl border border-[#DEC0B3]/60 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#9B4000] transition-all"
                         />
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-[#28180C]">Alamat Email atau Nomor Ponsel</label>
+                        <label className="text-xs font-bold text-[#28180C]">Alamat Email</label>
                         <input
-                            type="text"
-                            value={emailOrPhone}
-                            onChange={(e) => setEmailOrPhone(e.target.value)}
-                            placeholder="nama@gmail.com atau 0812xxxxxxxx"
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="nama@gmail.com"
+                            required
                             className="px-4 py-3 bg-[#FFF1E9]/50 text-xs sm:text-sm rounded-xl border border-[#DEC0B3]/60 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#9B4000] transition-all"
                         />
                     </div>
@@ -148,7 +184,8 @@ export default function RegisterPage() {
                                 type={showPassword ? "text" : "password"}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                placeholder="Buat kata sandi yang kuat"
+                                placeholder="Minimal 6 karakter"
+                                required
                                 className="w-full px-4 py-3 bg-[#FFF1E9]/50 text-xs sm:text-sm rounded-xl border border-[#DEC0B3]/60 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#9B4000] transition-all"
                             />
                             <button
@@ -171,6 +208,7 @@ export default function RegisterPage() {
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 placeholder="Masukkan ulang kata sandi Anda"
+                                required
                                 className="w-full px-4 py-3 bg-[#FFF1E9]/50 text-xs sm:text-sm rounded-xl border border-[#DEC0B3]/60 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#9B4000] transition-all"
                             />
                             <button
@@ -204,10 +242,20 @@ export default function RegisterPage() {
 
                     <button
                         type="submit"
-                        className="mt-2 w-full py-3.5 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-extrabold uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                        disabled={loading}
+                        className="mt-2 w-full py-3.5 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-extrabold uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                        <span>Daftar Akun Warga Baru</span>
-                        <ArrowRight className="w-4 h-4" />
+                        {loading ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Mendaftarkan Akun...</span>
+                            </>
+                        ) : (
+                            <>
+                                <span>Daftar Akun Warga Baru</span>
+                                <ArrowRight className="w-4 h-4" />
+                            </>
+                        )}
                     </button>
                 </form>
 
