@@ -25,6 +25,7 @@ export const newsDatabase: NewsItem[] = [
         date: "18 Oktober 2025",
         duration: "5 Menit Baca",
         likes: 1280,
+        image: "/images/infrastruktur.jpg",
         commentsList: [
             { id: "c1-1", author: "Budi Santoso", text: "Integrasi jadwal ini sangat membantu mobilitas harian saya." },
             { id: "c1-2", author: "Siti Rahma", text: "Semoga koridornya bisa segera diperluas ke kota penyangga." }
@@ -35,7 +36,7 @@ export const newsDatabase: NewsItem[] = [
         title: "Digitalisasi Pertanian Rakyat: Meningkatkan Hasil Panen Mandiri di Sentra Produksi",
         slug: "digitalisasi-pertanian-rakyat",
         excerpt: "Penerapan sensor kelembaban tanah berbiaya terjangkau meningkatkan margin keuntungan petani lokal hingga 34% secara berkelanjutan.",
-        content: `Penerapan teknologi sensor kelembaban tanah berbiaya terjangkau kini mulai dirasakan oleh kelompok tani di berbagai daerah sentra produksi. Inovasi berbasis Internet of Things (IoT) ini terbukti mampu meningkatkan margin keuntungan petani lokal hingga 34% melalui efisiensi penggunaan air dan pupuk.\n\nKementerian Pertanian menyatakan program digitalisasi mandiri akan diperluas ke 1.000 desa sentra pangan pada akhir tahun anggaran mendatang, disertai pendampingan teknis bagi para petani senior.`,
+        content: `Penerapan Teknologi Sensor: Penggunaan teknologi sensor kelembapan tanah berbasis Internet of Things (IoT) yang terjangkau kini mulai diterapkan oleh kelompok tani di berbagai daerah sentra produksi.   Peningkatan Keuntungan & Efisiensi: Inovasi ini terbukti mampu meningkatkan margin keuntungan petani lokal hingga 34% melalui efisiensi penggunaan air dan pupuk.   Perluasan Program Pemerintah: Kementerian Pertanian menyatakan bahwa program digitalisasi mandiri ini akan diperluas ke 1.000 desa sentra pangan pada akhir tahun anggaran mendatang, disertai dengan pendampingan teknis bagi para petani senior.`,
         category: "Ketahanan Pangan",
         source: "Wawasan Agraria",
         date: "18 Oktober 2025",
@@ -57,6 +58,7 @@ export const newsDatabase: NewsItem[] = [
         date: "17 Oktober 2025",
         duration: "6 Menit Baca",
         likes: 1120,
+        image: "/images/guru.jpg",
         commentsList: []
     },
     {

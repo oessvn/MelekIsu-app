@@ -12,19 +12,24 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "WartaGagasan — Berita Publik & Aspirasi Warga",
-    template: "%s | WartaGagasan",
+    default: "Nusantara Insight — Berita Publik & Aspirasi Warga",
+    template: "%s | Nusantara Insight",
   },
   description:
     "Platform berita publik dan aspirasi warga Indonesia. Baca berita, sampaikan komentar konstruktif, dan pantau perkembangan isu-isu penting.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id" className={`${inter.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col">
+      <body className="flex min-h-full flex-col bg-[#FFF8F5] text-[#28180C]">
+        {/* Navbar dinamis yang otomatis mendeteksi sesi akun warga */}
         <Navbar />
+
+        {/* Konten halaman utama */}
         <main className="flex-1">{children}</main>
+
+        {/* Footer situs */}
         <Footer />
       </body>
     </html>

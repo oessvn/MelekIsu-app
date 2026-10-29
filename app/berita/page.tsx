@@ -1,24 +1,41 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { MessageSquare, ThumbsUp, ArrowRight, Send, AlertCircle } from "lucide-react";
-import { newsDatabase } from "@/data/news"; // <-- Diletakkan di sini (baris atas)
+import { MessageSquare, ThumbsUp, ArrowRight, Send, AlertCircle, X, Search } from "lucide-react";
+import { newsDatabase } from "@/data/news";
 
 export default function BeritaPage() {
+    const searchParams = useSearchParams();
+    const searchQuery = searchParams.get("search") || "";
+
     const [selectedCategory, setSelectedCategory] = useState("Semua");
-    const [newsData, setNewsData] = useState(newsDatabase); // <-- Menggunakan data dari file pusat
+    const [newsData, setNewsData] = useState(newsDatabase);
     const [activeCommentBox, setActiveCommentBox] = useState<string | null>(null);
     const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>({});
+    const [keyword, setKeyword] = useState(searchQuery);
 
-    // Filter berita berdasarkan kategori yang dipilih
+    // Sinkronisasi keyword jika URL pencarian dari Navbar berubah
+    useEffect(() => {
+        setKeyword(searchQuery);
+    }, [searchQuery]);
+
+    // Filter berita berdasarkan kategori DAN kata kunci pencarian
     const filteredNews = useMemo(() => {
         return newsData.filter((item) => {
             const matchesCategory =
                 selectedCategory === "Semua" || item.category === selectedCategory;
-            return matchesCategory;
+
+            const matchesSearch =
+                item.title.toLowerCase().includes(keyword.toLowerCase()) ||
+                item.excerpt.toLowerCase().includes(keyword.toLowerCase()) ||
+                item.content.toLowerCase().includes(keyword.toLowerCase()) ||
+                item.source.toLowerCase().includes(keyword.toLowerCase());
+
+            return matchesCategory && matchesSearch;
         });
-    }, [newsData, selectedCategory]);
+    }, [newsData, selectedCategory, keyword]);
 
     // Handler untuk Like interaktif (hanya 1 kali, bisa toggle batalkan)
     const handleToggleLike = (id: string) => {
@@ -80,9 +97,9 @@ export default function BeritaPage() {
                             <button
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
-                                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap shadow-sm ${selectedCategory === cat
-                                    ? "bg-[#9B4000] text-white shadow-md"
-                                    : "bg-white text-[#574238] hover:bg-[#FFE3D1]"
+                                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap shadow-sm cursor-pointer ${selectedCategory === cat
+                                        ? "bg-[#9B4000] text-white shadow-md"
+                                        : "bg-white text-[#574238] hover:bg-[#FFE3D1]"
                                     }`}
                             >
                                 {cat}
@@ -95,13 +112,31 @@ export default function BeritaPage() {
             {/* Main Container */}
             <main className="max-w-[1360px] mx-auto px-6 py-8 flex flex-col gap-12">
 
-                {/* Section Heading */}
-                <div className="flex items-center justify-between pt-2">
-                    <div className="flex items-center gap-3">
-                        <div className="w-2.5 h-6 bg-[#9B4000] rounded-full"></div>
-                        <h1 className="text-xl font-extrabold text-[#28180C] tracking-tight">Semua Berita & Laporan Warga</h1>
+                {/* Section Heading & Search Keyword Indicator */}
+                <div className="flex flex-col gap-3 pt-2">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-2.5 h-6 bg-[#9B4000] rounded-full"></div>
+                            <h1 className="text-xl font-extrabold text-[#28180C] tracking-tight">Semua Berita & Laporan Warga</h1>
+                        </div>
+                        <span className="text-xs text-[#574238] font-medium hidden sm:inline-block">Menampilkan arsip terkini</span>
                     </div>
-                    <span className="text-xs text-[#574238] font-medium hidden sm:inline-block">Menampilkan arsip terkini</span>
+
+                    {/* Indikator Pencarian Aktif */}
+                    {keyword && (
+                        <div className="flex items-center gap-2 bg-[#FFF1E9] border border-[#DEC0B3]/60 px-4 py-2 rounded-xl w-fit">
+                            <span className="text-xs text-[#574238]">
+                                Hasil pencarian untuk: <strong className="text-[#9B4000]">"{keyword}"</strong>
+                            </span>
+                            <button
+                                onClick={() => setKeyword("")}
+                                className="text-[#9B4000] hover:text-[#28180C] cursor-pointer"
+                                title="Reset Pencarian"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* News Grid */}
@@ -118,7 +153,6 @@ export default function BeritaPage() {
                                     className="flex flex-col justify-between bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md border border-[#DEC0B3]/40 transition-all duration-300 group"
                                 >
                                     <div>
-                                        {/* Thumbnail */}
                                         {/* Thumbnail */}
                                         <div className="relative h-48 bg-gradient-to-tr from-[#F3D4c1] to-[#FFF8F5] flex items-center justify-center text-[#9B4000] overflow-hidden">
                                             {article.image ? (
@@ -182,7 +216,7 @@ export default function BeritaPage() {
                                                             onChange={(e) => setCommentInputs({ ...commentInputs, [article.id]: e.target.value })}
                                                             className="flex-1 bg-white px-3 py-1.5 text-xs rounded-lg border border-[#DEC0B3]/60 focus:outline-none focus:border-[#9B4000]"
                                                         />
-                                                        <button type="submit" className="bg-[#9B4000] text-white p-1.5 rounded-lg hover:bg-[#8C4A1E]">
+                                                        <button type="submit" className="bg-[#9B4000] text-white p-1.5 rounded-lg hover:bg-[#8C4A1E] cursor-pointer">
                                                             <Send className="w-3.5 h-3.5" />
                                                         </button>
                                                     </form>
@@ -208,12 +242,12 @@ export default function BeritaPage() {
                                                 <span>{commentCount}/3</span>
                                             </button>
 
-                                            {/* Tombol Like Interaktif (Berubah warna & batas 1x klik) */}
+                                            {/* Tombol Like Interaktif */}
                                             <button
                                                 onClick={() => handleToggleLike(article.id)}
                                                 className={`flex items-center gap-1.5 transition-all cursor-pointer px-2.5 py-1 rounded-full ${isLiked
-                                                    ? "bg-[#FFDDC9] text-[#9B4000] font-bold shadow-xs"
-                                                    : "hover:text-[#9B4000] text-[#574238]"
+                                                        ? "bg-[#FFDDC9] text-[#9B4000] font-bold shadow-xs"
+                                                        : "hover:text-[#9B4000] text-[#574238]"
                                                     }`}
                                                 title={isLiked ? "Batalkan Apresiasi" : "Beri Apresiasi"}
                                             >
@@ -238,13 +272,20 @@ export default function BeritaPage() {
                         })}
                     </div>
                 ) : (
-                    <div className="text-center py-12 bg-white rounded-2xl border border-[#DEC0B3]/40">
-                        <p className="text-base font-semibold text-[#574238]">Berita dalam kategori ini tidak ditemukan.</p>
+                    <div className="text-center py-16 bg-white rounded-3xl border border-[#DEC0B3]/40 flex flex-col items-center gap-3">
+                        <Search className="w-10 h-10 text-[#8B7266]" />
+                        <h3 className="text-base font-bold text-[#28180C]">Berita Tidak Ditemukan</h3>
+                        <p className="text-xs text-[#574238]">
+                            Tidak ada artikel yang cocok dengan kata kunci <strong className="text-[#9B4000]">"{keyword}"</strong>.
+                        </p>
                         <button
-                            onClick={() => setSelectedCategory("Semua")}
-                            className="mt-3 px-4 py-2 bg-[#9B4000] text-white text-xs font-bold rounded-xl"
+                            onClick={() => {
+                                setKeyword("");
+                                setSelectedCategory("Semua");
+                            }}
+                            className="mt-2 px-4 py-2 bg-[#9B4000] text-white text-xs font-bold rounded-xl cursor-pointer hover:bg-[#8C4A1E]"
                         >
-                            Reset Kategori
+                            Reset Filter & Pencarian
                         </button>
                     </div>
                 )}
