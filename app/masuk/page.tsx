@@ -168,13 +168,12 @@ export default function LoginPage() {
 
                         {/* Tautan Lupa Kata Sandi di bawah kolom input kata sandi sebelah kanan */}
                         <div className="flex justify-end pt-1">
-                            <a
-                                href="#"
-                                onClick={(e) => { e.preventDefault(); alert("Silakan hubungi administrator untuk pemulihan akun."); }}
+                            <Link
+                                href="/lupa-sandi"
                                 className="text-[11px] text-[#9B4000] font-bold hover:underline"
                             >
                                 Lupa Kata Sandi?
-                            </a>
+                            </Link>
                         </div>
                     </div>
 

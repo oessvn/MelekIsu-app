@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { MessageSquare, ThumbsUp, ArrowRight, Send, AlertCircle, X, Search } from "lucide-react";
 import { newsDatabase } from "@/data/news";
 
-export default function BeritaPage() {
+function BeritaContent() {
     const searchParams = useSearchParams();
     const searchQuery = searchParams.get("search") || "";
 
@@ -331,3 +331,6 @@ export default function BeritaPage() {
         </div>
     );
 }
+
+export default function BeritaPage() { return (<Suspense fallback={<div className="min-h-screen bg-[#FFF8F5]" />}><BeritaContent /></Suspense>); }
+
