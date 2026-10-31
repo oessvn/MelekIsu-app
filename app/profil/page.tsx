@@ -74,7 +74,7 @@ export default function UserProfilePage() {
         } finally {
             localStorage.removeItem("current_user");
             window.dispatchEvent(new Event("storage"));
-            router.push("/masuk");
+            router.replace("/");
         }
     };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, CheckCircle2, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
@@ -18,6 +18,12 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
+
+    // Pastikan modal dan form selalu dalam keadaan bersih saat halaman dimuat
+    useEffect(() => {
+        setShowSuccessModal(false);
+        setErrorMessage("");
+    }, []);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
