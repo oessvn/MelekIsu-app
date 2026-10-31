@@ -71,7 +71,7 @@ export default function HomePage() {
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap shadow-sm ${selectedCategory === cat
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap shadow-sm cursor-pointer ${selectedCategory === cat
                     ? "bg-[#9B4000] text-white shadow-md"
                     : "bg-white text-[#574238] hover:bg-[#FFE3D1]"
                   }`}
@@ -87,43 +87,55 @@ export default function HomePage() {
       {/* Main Container */}
       <main className="max-w-[1360px] mx-auto px-6 py-8 flex flex-col gap-12">
 
-        {/* Hero Spotlight Section */}
+        {/* Hero Spotlight Section (Sorotan Utama Redaksi) */}
         {featuredNews ? (
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+          <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
 
-            {/* Left Visual Banner */}
-            <div className="lg:col-span-7 relative group rounded-2xl overflow-hidden bg-gradient-to-br from-[#9B4000] to-[#C05407] shadow-lg flex min-h-[420px] p-8 text-white flex-col justify-between">
-              <div className="absolute inset-0 bg-black/10"></div>
+            {/* Kolom Kiri: Visual Banner Utama */}
+            <div className="lg:col-span-7 bg-[#9B4000] text-white rounded-3xl p-8 sm:p-10 flex flex-col justify-between shadow-lg relative overflow-hidden group">
+              {/* Aksen Dekoratif Latar Belakang */}
+              <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
 
-              {/* Badge */}
-              <div className="relative z-10 flex items-center gap-2 bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-full w-fit shadow-sm text-[#9B4000]">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                <span className="text-xs font-bold uppercase tracking-wider">Sorotan Utama Redaksi</span>
+              <div className="flex flex-col gap-6 relative z-10">
+                <div className="flex items-center gap-2">
+                  <span className="bg-[#FDB659] text-[#28180C] px-3.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider shadow-sm">
+                    ✓ Sorotan Utama Redaksi
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  <span className="text-xs font-bold tracking-widest text-[#FFDDC9] uppercase">
+                    {featuredNews.category.name}
+                  </span>
+                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug group-hover:text-[#FFDDC9] transition-colors">
+                    {featuredNews.title}
+                  </h1>
+                  <p className="text-xs sm:text-sm text-[#FFF8F5]/90 leading-relaxed line-clamp-3">
+                    {featuredNews.excerpt}
+                  </p>
+                </div>
               </div>
 
-              {/* Title & Info */}
-              <div className="relative z-10 mt-12 flex flex-col gap-3">
-                <span className="text-xs uppercase tracking-widest text-[#FFDBCB] font-semibold">{featuredNews.category.name}</span>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug">
-                  {featuredNews.title}
-                </h1>
-                <p className="text-sm text-white/90 line-clamp-2 max-w-xl leading-relaxed">
-                  {featuredNews.excerpt}
-                </p>
-              </div>
-
-              {/* Footer info inside banner */}
-              <div className="relative z-10 pt-4 flex items-center justify-between text-xs text-white/80 border-t border-white/20">
-                <span className="font-medium">Sumber: {featuredNews.source}</span>
-                <span className="bg-black/30 px-3 py-1 rounded-lg backdrop-blur-sm">Analisis Kebijakan</span>
+              <div className="pt-8 mt-6 border-t border-white/20 flex items-center justify-between relative z-10">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-[#FFDDC9] uppercase tracking-wider font-semibold">Sumber Rujukan</span>
+                  <span className="text-xs font-bold text-white">{featuredNews.source}</span>
+                </div>
+                <Link
+                  href={`/berita/${featuredNews.slug}`}
+                  className="px-5 py-2.5 bg-white text-[#9B4000] hover:bg-[#FFF8F5] text-xs font-bold rounded-xl shadow-md transition-all duration-300 flex items-center gap-2 group-hover:scale-105 cursor-pointer"
+                >
+                  <span>Analisis Kebijakan</span>
+                  <span>→</span>
+                </Link>
               </div>
             </div>
 
-            {/* Right Editorial Summary Card */}
-            <div className="lg:col-span-5 flex flex-col justify-between bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-[#DEC0B3]/40">
-              <div className="flex flex-col gap-4">
+            {/* Kolom Kanan: Editorial Summary Card */}
+            <div className="lg:col-span-5 bg-white rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-sm border border-[#DEC0B3]/40 hover:shadow-md transition-all duration-300 group">
+              <div className="flex flex-col gap-5">
                 <div className="flex items-center justify-between">
-                  <span className="bg-[#FFDDC9] text-[#724700] px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">
+                  <span className="bg-[#FFDDC9] text-[#724700] px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide">
                     {featuredNews.category.name}
                   </span>
                   <span className="text-xs text-[#574238] flex items-center gap-1 font-medium">
@@ -131,41 +143,34 @@ export default function HomePage() {
                   </span>
                 </div>
 
-                <h2 className="text-xl font-bold text-[#28180C] leading-snug">
+                <h2 className="text-lg font-bold text-[#28180C] group-hover:text-[#9B4000] transition-colors leading-snug line-clamp-2">
                   {featuredNews.title}
                 </h2>
 
-                <p className="text-sm text-[#574238] leading-relaxed">
+                <p className="text-xs sm:text-sm text-[#574238] leading-relaxed line-clamp-2">
                   {featuredNews.excerpt}
                 </p>
 
                 {/* Key Insights Box */}
-                <div className="bg-[#FFF1E9] p-4 rounded-xl border border-[#DEC0B3]/30 flex flex-col gap-2">
-                  <div className="flex items-center gap-2 text-[#9B4000] font-bold text-xs">
-                    <span>💡</span>
-                    <span>Ringkasan Fakta & Dampak Langsung:</span>
-                  </div>
-                  <ul className="flex flex-col gap-1.5 text-xs text-[#28180C]">
-                    <li className="flex items-start gap-2">
-                      <span className="text-[#9B4000] font-bold">•</span>
-                      <span>Transparansi data real-time & akuntabilitas anggaran terverifikasi.</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-[#9B4000] font-bold">•</span>
-                      <span>Partisipasi aktif warga melalui kanal kuota esai berbobot.</span>
-                    </li>
+                <div className="bg-[#FFF8F5] p-3.5 rounded-2xl border border-[#DEC0B3]/30 space-y-1.5">
+                  <span className="text-[11px] font-bold text-[#9B4000] flex items-center gap-1">
+                    💡 Ringkasan Fakta & Dampak Langsung:
+                  </span>
+                  <ul className="text-[11px] text-[#574238] space-y-1 pl-4 list-disc">
+                    <li>Transparansi data real-time & akuntabilitas anggaran terverifikasi.</li>
+                    <li>Partisipasi aktif warga melalui kanal kuota esai berbobot.</li>
                   </ul>
                 </div>
               </div>
 
-              <div className="pt-6 mt-6 border-t border-[#DEC0B3]/30 flex items-center justify-between">
-                <div className="flex items-center gap-4 text-xs text-[#574238]">
-                  <span className="flex items-center gap-1">💬 <strong className="text-[#28180C]">142</strong></span>
-                  <span className="flex items-center gap-1">👍 <strong className="text-[#28180C]">1,280</strong></span>
+              <div className="pt-5 mt-5 border-t border-[#DEC0B3]/20 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-4 text-[#574238]">
+                  <span className="flex items-center gap-1 font-semibold">💬 <strong className="text-[#28180C]">142</strong></span>
+                  <span className="flex items-center gap-1 font-semibold">👍 <strong className="text-[#28180C]">1,280</strong></span>
                 </div>
                 <Link
                   href={`/berita/${featuredNews.slug}`}
-                  className="inline-flex items-center gap-2 bg-[#9B4000] hover:bg-[#8C4A1E] text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition-all"
+                  className="px-4 py-2 bg-[#9B4000] hover:bg-[#8C4A1E] text-white font-bold rounded-xl shadow-xs transition-all duration-300 flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>Baca Artikel</span>
                   <span>→</span>
@@ -177,7 +182,7 @@ export default function HomePage() {
         ) : (
           <div className="text-center py-12 bg-white rounded-2xl border border-[#DEC0B3]/40">
             <p className="text-base font-semibold text-[#574238]">Berita dalam kategori ini tidak ditemukan.</p>
-            <button onClick={() => setSelectedCategory("Semua")} className="mt-3 px-4 py-2 bg-[#9B4000] text-white text-xs font-bold rounded-xl">
+            <button onClick={() => setSelectedCategory("Semua")} className="mt-3 px-4 py-2 bg-[#9B4000] text-white text-xs font-bold rounded-xl cursor-pointer">
               Reset Kategori
             </button>
           </div>
@@ -243,14 +248,14 @@ export default function HomePage() {
                 <span className="text-[10px] bg-[#FDB659] text-[#724700] font-bold px-2 py-0.5 rounded-full">Etika Partisipasi Warga</span>
                 <span className="text-[11px] text-[#574238]">Kebijakan Anti-Disinformasi UU No. 1/2024</span>
               </div>
-              <h3 className="text-base font-bold text-[#28180C]">Ruang Dialog Konstruktif: Kuota 3 Komentar Berbobot Per Artikel</h3>
+              <h3 className="text-base font-bold text-[#28180C]">Ruang Dialog Konstruktif: Kuota 1 Komentar Berbobot Per Artikel</h3>
               <p className="text-xs text-[#574238] leading-relaxed">
-                Demi menjaga kedalaman argumen dan mencegah spam, setiap warga terverifikasi memiliki kuota 3 tanggapan berbobot per esai kebijakan.
+                Demi menjaga kedalaman argumen dan mencegah spam, setiap warga terverifikasi memiliki kuota 1 tanggapan berbobot per esai kebijakan.
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0 w-full lg:w-auto justify-end">
-            <button className="w-full lg:w-auto px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#9B4000] hover:bg-[#8C4A1E] transition-all shadow-sm">
+            <button className="w-full lg:w-auto px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#9B4000] hover:bg-[#8C4A1E] transition-all shadow-sm cursor-pointer">
               Kirim Esai Opini Warga
             </button>
           </div>

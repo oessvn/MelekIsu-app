@@ -15,13 +15,17 @@ export default function BeritaPage() {
     const [activeCommentBox, setActiveCommentBox] = useState<string | null>(null);
     const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>({});
     const [keyword, setKeyword] = useState(searchQuery);
+    const [currentUser, setCurrentUser] = useState<any>(null);
 
-    // Sinkronisasi keyword jika URL pencarian dari Navbar berubah
+    // Ambil data user yang sedang aktif dari localStorage
     useEffect(() => {
+        const activeUser = localStorage.getItem("current_user");
+        if (activeUser) {
+            setCurrentUser(JSON.parse(activeUser));
+        }
         setKeyword(searchQuery);
     }, [searchQuery]);
 
-    // Filter berita berdasarkan kategori DAN kata kunci pencarian
     const filteredNews = useMemo(() => {
         return newsData.filter((item) => {
             const matchesCategory =
@@ -37,7 +41,6 @@ export default function BeritaPage() {
         });
     }, [newsData, selectedCategory, keyword]);
 
-    // Handler untuk Like interaktif (hanya 1 kali, bisa toggle batalkan)
     const handleToggleLike = (id: string) => {
         setNewsData((prev) =>
             prev.map((item) => {
@@ -55,22 +58,46 @@ export default function BeritaPage() {
         );
     };
 
-    // Handler untuk submit komentar baru (maksimal 3 komentar)
+    // Handler untuk mengirim komentar (1 user hanya boleh 1 komentar per artikel)
     const handleAddComment = (id: string, e: React.FormEvent) => {
         e.preventDefault();
+
+        // Cek apakah user sudah login
+        if (!currentUser) {
+            alert("Silakan Masuk atau Daftar terlebih dahulu untuk berpartisipasi dalam diskusi warga.");
+            return;
+        }
+
         const text = commentInputs[id]?.trim();
         if (!text) return;
+
+        const targetArticle = newsData.find((item) => item.id === id);
+        if (!targetArticle) return;
+
+        // Cek apakah user ini sudah pernah berkomentar di artikel ini
+        const hasCommented = targetArticle.commentsList.some(
+            (c: any) => c.authorEmail === currentUser.emailOrPhone || c.author === currentUser.fullName
+        );
+
+        if (hasCommented) {
+            alert("Batas kuota tercapai: Anda sudah mengirimkan 1 komentar pada artikel ini. Berikan kesempatan kepada warga lainnya!");
+            return;
+        }
+
+        // Alert konfirmasi perhatian sebelum mengirim
+        const confirmSend = window.confirm(
+            "Perhatian: Setiap warga hanya dapat mengirimkan 1 komentar per artikel dan tidak dapat diubah kembali. Pastikan tanggapan Anda sudah berbobot. Lanjutkan kirim?"
+        );
+
+        if (!confirmSend) return;
 
         setNewsData((prev) =>
             prev.map((item) => {
                 if (item.id === id) {
-                    if (item.commentsList.length >= 3) {
-                        alert("Batas kuota tercapai: Setiap warga maksimal memberikan 3 komentar berbobot per artikel.");
-                        return item;
-                    }
                     const newComment = {
                         id: `c-${Date.now()}`,
-                        author: "Warga Terverifikasi",
+                        author: currentUser.fullName,
+                        authorEmail: currentUser.emailOrPhone,
                         text: text,
                     };
                     return {
@@ -82,7 +109,7 @@ export default function BeritaPage() {
             })
         );
 
-        // Kosongkan input setelah dikirim
+        // Kosongkan input setelah terkirim
         setCommentInputs((prev) => ({ ...prev, [id]: "" }));
     };
 
@@ -122,7 +149,6 @@ export default function BeritaPage() {
                         <span className="text-xs text-[#574238] font-medium hidden sm:inline-block">Menampilkan arsip terkini</span>
                     </div>
 
-                    {/* Indikator Pencarian Aktif */}
                     {keyword && (
                         <div className="flex items-center gap-2 bg-[#FFF1E9] border border-[#DEC0B3]/60 px-4 py-2 rounded-xl w-fit">
                             <span className="text-xs text-[#574238]">
@@ -144,8 +170,15 @@ export default function BeritaPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
                         {filteredNews.map((article) => {
                             const isCommentOpen = activeCommentBox === article.id;
-                            const commentCount = article.commentsList.length;
+                            const commentCount = article.commentsList.length; // Angka real-time jumlah komentar
                             const isLiked = (article as any).isLiked || false;
+
+                            // Cek apakah user yang sedang login sudah pernah berkomentar di artikel ini
+                            const userAlreadyCommented = currentUser
+                                ? article.commentsList.some(
+                                    (c: any) => c.authorEmail === currentUser.emailOrPhone || c.author === currentUser.fullName
+                                )
+                                : false;
 
                             return (
                                 <article
@@ -188,16 +221,15 @@ export default function BeritaPage() {
                                         {isCommentOpen && (
                                             <div className="bg-[#FFF8F5] p-3 rounded-xl border border-[#DEC0B3]/40 mb-3 flex flex-col gap-2.5">
                                                 <div className="flex items-center justify-between text-[11px] font-bold text-[#8B7266]">
-                                                    <span>Diskusi Warga ({commentCount}/3 Kuota)</span>
-                                                    {commentCount >= 3 && <span className="text-amber-700">Kuota Penuh</span>}
+                                                    <span>Diskusi Warga ({commentCount} Komentar Masuk)</span>
                                                 </div>
 
                                                 {/* List Komentar */}
                                                 <div className="space-y-1.5 max-h-32 overflow-y-auto">
                                                     {article.commentsList.length === 0 ? (
-                                                        <p className="text-[11px] text-[#8B7266] italic">Belum ada tanggapan. Jadilah yang pertama!</p>
+                                                        <p className="text-[11px] text-[#8B7266] italic">Belum ada tanggapan. Jadilah warga pertama yang berkomentar!</p>
                                                     ) : (
-                                                        article.commentsList.map((c) => (
+                                                        article.commentsList.map((c: any) => (
                                                             <div key={c.id} className="bg-white p-2 rounded-lg border border-[#DEC0B3]/30 text-[11px]">
                                                                 <strong className="text-[#9B4000]">{c.author}: </strong>
                                                                 <span className="text-[#28180C]">{c.text}</span>
@@ -206,25 +238,29 @@ export default function BeritaPage() {
                                                     )}
                                                 </div>
 
-                                                {/* Form Input Komentar (jika belum 3) */}
-                                                {commentCount < 3 ? (
+                                                {/* Form Input Komentar Berdasarkan Status User */}
+                                                {!currentUser ? (
+                                                    <div className="text-[11px] text-[#9B4000] bg-white p-2 rounded-lg border border-[#DEC0B3]/50 text-center font-bold">
+                                                        <Link href="/masuk" className="underline">Masuk</Link> untuk mengirim 1 komentar berbobot Anda.
+                                                    </div>
+                                                ) : userAlreadyCommented ? (
+                                                    <div className="text-[10px] text-amber-800 bg-amber-50 p-2 rounded-lg flex items-center gap-1.5 border border-amber-200">
+                                                        <AlertCircle className="w-4 h-4 shrink-0 text-amber-700" />
+                                                        <span>Anda sudah mengirimkan 1 komentar pada artikel ini. Terima kasih atas partisipasinya!</span>
+                                                    </div>
+                                                ) : (
                                                     <form onSubmit={(e) => handleAddComment(article.id, e)} className="flex items-center gap-1.5 mt-1">
                                                         <input
                                                             type="text"
-                                                            placeholder="Tulis tanggapan berbobot..."
+                                                            placeholder="Tulis 1 tanggapan berbobot Anda..."
                                                             value={commentInputs[article.id] || ""}
                                                             onChange={(e) => setCommentInputs({ ...commentInputs, [article.id]: e.target.value })}
                                                             className="flex-1 bg-white px-3 py-1.5 text-xs rounded-lg border border-[#DEC0B3]/60 focus:outline-none focus:border-[#9B4000]"
                                                         />
-                                                        <button type="submit" className="bg-[#9B4000] text-white p-1.5 rounded-lg hover:bg-[#8C4A1E] cursor-pointer">
+                                                        <button type="submit" className="bg-[#9B4000] text-white p-1.5 rounded-lg hover:bg-[#8C4A1E] cursor-pointer" title="Kirim Komentar">
                                                             <Send className="w-3.5 h-3.5" />
                                                         </button>
                                                     </form>
-                                                ) : (
-                                                    <div className="text-[10px] text-amber-800 bg-amber-50 p-1.5 rounded flex items-center gap-1">
-                                                        <AlertCircle className="w-3 h-3 shrink-0" />
-                                                        <span>Batas 3 komentar per artikel telah tercapai.</span>
-                                                    </div>
                                                 )}
                                             </div>
                                         )}
@@ -233,13 +269,14 @@ export default function BeritaPage() {
                                     {/* Footer Card */}
                                     <div className="p-5 pt-0 mt-auto flex items-center justify-between border-t border-[#DEC0B3]/20 pt-4 text-xs text-[#574238]">
                                         <div className="flex items-center gap-3">
-                                            {/* Tombol Toggle Komentar */}
+                                            {/* Tombol Toggle Komentar dengan Angka Real-Time */}
                                             <button
                                                 onClick={() => setActiveCommentBox(isCommentOpen ? null : article.id)}
                                                 className="flex items-center gap-1 hover:text-[#9B4000] transition-colors cursor-pointer"
+                                                title="Lihat Diskusi Komentar"
                                             >
                                                 <MessageSquare className="w-3.5 h-3.5 text-[#8B7266]" />
-                                                <span>{commentCount}/3</span>
+                                                <span className="font-bold text-[#28180C]">{commentCount}</span>
                                             </button>
 
                                             {/* Tombol Like Interaktif */}

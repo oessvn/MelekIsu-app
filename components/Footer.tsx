@@ -18,7 +18,6 @@ const footerLinks = [
     links: [
       { href: "/masuk", label: "Masuk" },
       { href: "/daftar", label: "Daftar" },
-      { href: "/dasbor", label: "Dasbor" },
     ],
   },
   {

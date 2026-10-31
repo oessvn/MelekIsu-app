@@ -136,9 +136,13 @@ export default function Navbar() {
             href="/"
             className="flex items-center gap-2 text-xl font-bold tracking-tight text-[#9B4000] shrink-0"
           >
-            <Newspaper className="h-6 w-6 text-[#9B4000]" />
+            <img
+              src="/images/logo.png"
+              alt="Logo Nusantara Insight"
+              className="w-8 h-8 object-contain rounded-xl shadow-xs"
+            />
             <span className="font-editorial">
-              Nusantara<span className="text-[#FDB659]">Insight</span>
+              Melek<span className="text-[#FDB659]">Isu</span>
             </span>
           </Link>
 
