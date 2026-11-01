@@ -138,7 +138,7 @@ export default function Navbar() {
           >
             <img
               src="/images/logo.png"
-              alt="Logo Nusantara Insight"
+              alt="Logo MelekIsu"
               className="w-8 h-8 object-contain rounded-xl shadow-xs"
             />
             <span className="font-editorial">
