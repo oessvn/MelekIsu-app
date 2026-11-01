@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import AIChatWidget from "@/components/AIChatWidget";
 import "./globals.css";
 
 const inter = Inter({
@@ -12,8 +13,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "Nusantara Insight — Berita Publik & Aspirasi Warga",
-    template: "%s | Nusantara Insight",
+    default: "MelekIsu",
+    template: "%s | MelekIsu",
   },
   description:
     "Platform berita publik dan aspirasi warga Indonesia. Baca berita, sampaikan komentar konstruktif, dan pantau perkembangan isu-isu penting.",
@@ -31,6 +32,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         {/* Footer situs */}
         <Footer />
+
+        {/* Widget Chatbot AI Asisten Kebijakan Publik */}
+        <AIChatWidget />
       </body>
     </html>
   );
