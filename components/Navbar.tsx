@@ -173,7 +173,6 @@ export default function Navbar() {
               className="w-full pl-9 pr-8 py-1.5 text-sm bg-white text-gray-800 placeholder-gray-400 rounded-lg border border-[#DEC0B3]/60 focus:outline-none focus:border-[#9B4000] focus:ring-1 focus:ring-[#9B4000] transition-all shadow-inner"
             />
 
-            {/* Tombol X untuk menghapus teks pencarian (hanya muncul saat ada teks diketik) */}
             {searchQuery && (
               <button
                 type="button"
@@ -187,22 +186,24 @@ export default function Navbar() {
           </div>
         </form>
 
-        {/* Desktop Auth / User Profile */}
+        {/* --- DESKTOP AUTH / CLEAN & PROFESSIONAL USER PROFILE --- */}
         <div className="hidden md:flex items-center gap-2 shrink-0">
           {currentUser ? (
-            /* Jika sudah login, tampilkan profil mini */
+            /* Tampilan Profil Baru: Minimalis, Clean, dan Elegan */
             <Link
               href="/profil"
-              className="flex items-center gap-2 px-3 py-1.5 bg-[#FFF1E9] hover:bg-[#FFE5D4] text-[#9B4000] rounded-xl border border-[#DEC0B3]/60 transition-all shadow-2xs group"
+              className="flex items-center gap-2.5 px-3 py-1.5 bg-white hover:bg-[#FFF1E9] text-[#28180C] rounded-full border border-[#DEC0B3]/60 transition-all shadow-xs group"
             >
-              <div className="w-7 h-7 rounded-full bg-[#9B4000] text-white flex items-center justify-center text-xs font-extrabold shadow-inner">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#9B4000] to-[#FDB659] text-white flex items-center justify-center text-xs font-bold shadow-xs group-hover:scale-105 transition-transform">
                 {currentUser.fullName ? currentUser.fullName.charAt(0).toUpperCase() : "W"}
               </div>
-              <div className="flex flex-col text-left">
-                <span className="text-xs font-extrabold text-[#28180C] group-hover:text-[#9B4000] transition-colors">
+              <div className="flex items-center gap-1.5 pr-1">
+                <span className="text-xs font-bold text-[#28180C] group-hover:text-[#9B4000] transition-colors">
                   {currentUser.fullName ? currentUser.fullName.split(" ")[0] : "Warga"}
                 </span>
-                <span className="text-[9px] text-[#8B7266] uppercase font-bold tracking-tight">Warga</span>
+                <span className="text-[10px] bg-[#FFF1E9] text-[#9B4000] font-bold px-2 py-0.5 rounded-full border border-[#DEC0B3]/40">
+                  ✓ Warga
+                </span>
               </div>
             </Link>
           ) : (
@@ -280,10 +281,15 @@ export default function Navbar() {
                 <Link
                   href="/profil"
                   onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-2 rounded-lg bg-[#FFF1E9] px-3 py-2.5 text-sm font-bold text-[#9B4000] transition-colors"
+                  className="flex items-center justify-between rounded-lg bg-white px-3.5 py-2.5 text-sm font-bold text-[#28180C] border border-[#DEC0B3]/50 shadow-xs"
                 >
-                  <User className="h-4 w-4" />
-                  Profil Saya ({currentUser.fullName})
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#9B4000] to-[#FDB659] text-white flex items-center justify-center text-xs font-bold">
+                      {currentUser.fullName ? currentUser.fullName.charAt(0).toUpperCase() : "W"}
+                    </div>
+                    <span>{currentUser.fullName}</span>
+                  </div>
+                  <span className="text-[10px] bg-[#FFF1E9] text-[#9B4000] px-2 py-0.5 rounded-full border border-[#DEC0B3]/40">✓ Warga</span>
                 </Link>
               ) : (
                 <>
