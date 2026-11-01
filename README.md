@@ -1,4 +1,4 @@
-# WarTahu (Warta & Aksi Gagasan Terpadu)
+# MelekIsu
 
 > Platform digital interaktif untuk menyuarakan aspirasi masyarakat, menyajikan warta terkini, dan memantau transparansi aksi nyata dari berbagai gagasan publik.
 
@@ -20,8 +20,8 @@ Ikuti panduan berikut untuk menjalankan project di komputer lokal:
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/oessvn/WarTahu-app.git
-cd WarTahu-app
+git clone https://github.com/oessvn/MelekIsu-app.git
+cd MelekIsu-app
 ```
 
 ### 2. Install Dependencies
