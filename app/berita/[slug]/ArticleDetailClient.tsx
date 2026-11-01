@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, MessageSquare, ThumbsUp, Send, AlertCircle, Building2, Calendar, Clock, CheckCircle2, HelpCircle } from "lucide-react";
+import { ArrowLeft, MessageSquare, ThumbsUp, Send, AlertCircle, Building2, Calendar, Clock, CheckCircle2, HelpCircle, FileText } from "lucide-react";
 import { newsDatabase } from "@/data/news";
 
 export default function ArticleDetailClient({ slug }: { slug: string }) {
@@ -10,7 +10,7 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
 
     const [likes, setLikes] = useState(articleData ? articleData.likes : 0);
     const [isLiked, setIsLiked] = useState(false);
-    const [comments, setComments] = useState(articleData ? articleData.commentsList : []);
+    const [comments, setComments] = useState<any[]>([]);
     const [newComment, setNewComment] = useState("");
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [userSubmissionCount, setUserSubmissionCount] = useState(0);
@@ -20,20 +20,47 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     useEffect(() => {
-        const activeUser = localStorage.getItem("current_user");
-        if (activeUser) {
-            const parsedUser = JSON.parse(activeUser);
-            setCurrentUser(parsedUser);
+        if (!articleData) return;
 
-            if (articleData) {
-                const alreadyCommented = articleData.commentsList.some(
-                    (c: any) => c.authorEmail === parsedUser.emailOrPhone || c.author === parsedUser.fullName
-                );
-                if (alreadyCommented) {
-                    setUserSubmissionCount(1);
+        const syncComments = () => {
+            const storageKey = `comments_${articleData.slug}`;
+            const saved = localStorage.getItem(storageKey);
+            let list: any[] = [];
+
+            if (saved) {
+                try {
+                    list = JSON.parse(saved);
+                } catch {
+                    list = articleData.commentsList;
+                }
+            } else {
+                list = articleData.commentsList;
+                localStorage.setItem(storageKey, JSON.stringify(list));
+            }
+
+            setComments(list);
+
+            const activeUser = localStorage.getItem("current_user");
+            if (activeUser) {
+                try {
+                    const parsedUser = JSON.parse(activeUser);
+                    setCurrentUser(parsedUser);
+
+                    const alreadyCommented = list.some(
+                        (c: any) =>
+                            (parsedUser.emailOrPhone && c.authorEmail === parsedUser.emailOrPhone) ||
+                            (parsedUser.fullName && c.author === parsedUser.fullName)
+                    );
+                    setUserSubmissionCount(alreadyCommented ? 1 : 0);
+                } catch {
+                    setCurrentUser(null);
                 }
             }
-        }
+        };
+
+        syncComments();
+        window.addEventListener("storage", syncComments);
+        return () => window.removeEventListener("storage", syncComments);
     }, [articleData]);
 
     if (!articleData) {
@@ -88,12 +115,18 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
             author: currentUser.fullName,
             authorEmail: currentUser.emailOrPhone,
             text: newComment.trim(),
-            status: "Menunggu Verifikasi",
+            status: "Menunggu Verifikasi" as const,
         };
 
         const updatedComments = [...comments, newEntry];
         setComments(updatedComments);
-        articleData.commentsList = updatedComments;
+
+        if (articleData) {
+            articleData.commentsList = updatedComments;
+            const storageKey = `comments_${articleData.slug}`;
+            localStorage.setItem(storageKey, JSON.stringify(updatedComments));
+            window.dispatchEvent(new Event("storage"));
+        }
 
         setNewComment("");
         setShowSuccessModal(true);
@@ -191,7 +224,7 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
                             <img src={articleData.image} alt={articleData.title} className="w-full h-full object-cover" />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-[#9B4000]">
-                                <span className="text-7xl">📰</span>
+                                <FileText className="w-16 h-16 text-[#9B4000] opacity-50" />
                             </div>
                         )}
                     </div>
@@ -256,9 +289,17 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
                                 <div key={c.id} className="bg-[#FFF8F5] p-4 rounded-xl border border-[#DEC0B3]/30 flex flex-col gap-1">
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-bold text-[#9B4000]">{c.author}</span>
-                                        <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-semibold">
-                                            {c.status || "Terverifikasi"}
-                                        </span>
+                                        {c.status === "Menunggu Verifikasi" ? (
+                                            <span className="text-[10px] text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-2xs">
+                                                <Clock className="w-3 h-3 text-amber-700 animate-pulse" />
+                                                <span>Menunggu Verifikasi</span>
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-2xs">
+                                                <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                                                <span>Terverifikasi</span>
+                                            </span>
+                                        )}
                                     </div>
                                     <p className="text-xs sm:text-sm text-[#28180C] leading-normal">{c.text}</p>
                                 </div>

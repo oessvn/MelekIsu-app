@@ -1,3 +1,12 @@
+﻿export interface NewsComment {
+    id: string;
+    author: string;
+    authorEmail?: string;
+    text: string;
+    status?: "Terverifikasi" | "Menunggu Verifikasi";
+    createdAt?: string;
+}
+
 export interface NewsItem {
     id: string;
     title: string;
@@ -10,9 +19,8 @@ export interface NewsItem {
     duration: string;
     likes: number;
     image?: string;
-    commentsList: { id: string; author: string; text: string }[];
+    commentsList: NewsComment[];
 }
-
 export const newsDatabase: NewsItem[] = [
     {
         id: "1",

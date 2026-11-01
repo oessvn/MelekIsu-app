@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WarTahu (Warta & Aksi Gagasan Terpadu)
 
-## Getting Started
+> Platform digital interaktif untuk menyuarakan aspirasi masyarakat, menyajikan warta terkini, dan memantau transparansi aksi nyata dari berbagai gagasan publik.
 
-First, run the development server:
+---
 
+## 🛠️ Tech Stack
+
+* **Framework:** Next.js (App Router) & React 19
+* **Language:** TypeScript
+* **Styling:** Tailwind CSS
+* **Database & Auth:** Supabase (`@supabase/ssr`, `@supabase/supabase-js`)
+* **Icons:** Lucide React
+
+---
+
+## 🚀 Cara Menjalankan Project
+
+Ikuti panduan berikut untuk menjalankan project di komputer lokal:
+
+### 1. Clone Repository
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/oessvn/WarTahu-app.git
+cd WarTahu-app
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Install Dependencies
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. Konfigurasi Environment Variable
+Duplikat file `.env.example` menjadi `.env.local`:
+```bash
+cp .env.example .env.local
+```
+*(Atau buat file `.env.local` secara manual dan salin konfigurasi berikut)*:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://henxsxlsmmtpxfvyssqx.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_QBw-hf8KNt3pV423CtPkAg_-RQeETe4
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 4. Jalankan Development Server
+```bash
+npm run dev
+```
 
-## Learn More
+Buka browser dan akses [http://localhost:3000](http://localhost:3000).
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 📌 Progress Saat Ini
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Hingga tahap **First Draft Submission (01 November 2026)**, progres pengembangan aplikasi mencakup:
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+* [x] **Landing Page Utama (`/`):** Hero section, navigasi responsif, tinjauan isu terkini, dan statistik partisipasi warga.
+* [x] **Modul Berita & Warta (`/berita`):** Tampilan katalog berita/artikel beserta filter kategori dan pencarian (masih menggunakan mock data).
+* [x] **Detail Berita Interaktif (`/berita/[slug]`):** Halaman baca berita lengkap dengan sistem reaksi dan antarmuka komentar (masih menggunakan mock data).
+* [x] **Transparansi Aksi (`/transparansi-aksi`):** Pelacakan progres status aksi nyata (tahap verifikasi, riset, implementasi, hingga selesai) beserta dokumentasi kegiatan.
+* [x] **Modul Autentikasi Pengguna:**
+  * Halaman Masuk / Login (`/masuk`)
+  * Halaman Pendaftaran Akun (`/daftar`)
+  * Pemulihan & Pergantian Kata Sandi (`/lupa-sandi` & `/ubah-sandi`)
+* [x] **Manajemen Profil Pengguna (`/profil`):** Informasi akun dan riwayat aktivitas.
+* [ ] *Tahap Berikutnya:*
+  * **Integrasi Database Penuh (Supabase):** Menghubungkan modul berita (publikasi/manajemen artikel) dan penyimpanan komentar pengguna ke database Supabase secara dinamis (menggantikan mock data).
+  * **Integrasi AI Chatbot:** Asisten AI interaktif untuk memfasilitasi tanya-jawab seputar isu/berita serta mensimulasikan dan menganalisis pendapat maupun masukan pembaca.
+  * **Dashboard Admin & Moderasi Komentar (AI-Assisted):** Panel khusus admin untuk memverifikasi dan menyetujui komentar yang masuk, didukung AI untuk kurasi otomatis (deteksi spam, sentimen negatif, dan ujaran kebencian).
+  * Formulir pengajuan aspirasi warga baru beserta sistem tracking statusnya.
+  * Finalisasi responsivitas UI dan pengujian menyeluruh (cross-browser testing).

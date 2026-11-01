@@ -1,15 +1,15 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { MessageSquare, CheckCircle2, Clock, Building2, ArrowRight, FileText } from "lucide-react";
+import { MessageSquare, CheckCircle2, Clock, Building2, ArrowRight, FileText, Train, Sprout, GraduationCap } from "lucide-react";
 
 // Data dummy tanggapan pemerintah & instansi atas saran warga
 const actionTransparencyData = [
     {
         id: "act-1",
         agency: "Kementerian Perhubungan & KCIC",
-        agencyLogo: "🚂",
+        agencyIcon: Train,
         newsTitle: "Revolusi Mobilitas Berkelanjutan: Integrasi Transit Nol Emisi di Seluruh Koridor Urban 2025",
         newsSlug: "revolusi-mobilitas-berkelanjutan",
         citizenName: "Budi Santoso (Warga Terverifikasi)",
@@ -22,7 +22,7 @@ const actionTransparencyData = [
     {
         id: "act-2",
         agency: "Kementerian Pertanian RI",
-        agencyLogo: "🌾",
+        agencyIcon: Sprout,
         newsTitle: "Digitalisasi Pertanian Rakyat: Meningkatkan Hasil Panen Mandiri di Sentra Produksi",
         newsSlug: "digitalisasi-pertanian-rakyat",
         citizenName: "Siti Rahmawati (Warga Terverifikasi)",
@@ -35,7 +35,7 @@ const actionTransparencyData = [
     {
         id: "act-3",
         agency: "Kementerian Pendidikan, Kebudayaan, Riset, dan Teknologi",
-        agencyLogo: "🎓",
+        agencyIcon: GraduationCap,
         newsTitle: "Akselerasi Literasi AI & Coding untuk 50.000 Mahasiswa Vokasi Luar Jawa",
         slug: "akselerasi-literasi-ai",
         citizenName: "Ahmad Fauzi (Warga Terverifikasi)",
@@ -112,7 +112,7 @@ export default function TransparansiAksiPage() {
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-[#DEC0B3]/20">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-[#FFF1E9] flex items-center justify-center text-xl shrink-0 border border-[#DEC0B3]/40">
-                                        {item.agencyLogo}
+                                        <item.agencyIcon className="w-5 h-5 text-[#9B4000]" />
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-bold text-[#28180C] flex items-center gap-1.5">

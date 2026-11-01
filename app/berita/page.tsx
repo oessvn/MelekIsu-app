@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { MessageSquare, ThumbsUp, ArrowRight, Send, AlertCircle, X, Search } from "lucide-react";
+import { MessageSquare, ThumbsUp, ArrowRight, Send, AlertCircle, X, Search, FileText } from "lucide-react";
 import { newsDatabase } from "@/data/news";
 
 function BeritaContent() {
@@ -17,13 +17,41 @@ function BeritaContent() {
     const [keyword, setKeyword] = useState(searchQuery);
     const [currentUser, setCurrentUser] = useState<any>(null);
 
-    // Ambil data user yang sedang aktif dari localStorage
+    // Sinkronisasi data user dan komentar dari localStorage
     useEffect(() => {
-        const activeUser = localStorage.getItem("current_user");
-        if (activeUser) {
-            setCurrentUser(JSON.parse(activeUser));
-        }
+        const syncData = () => {
+            const activeUser = localStorage.getItem("current_user");
+            if (activeUser) {
+                try {
+                    setCurrentUser(JSON.parse(activeUser));
+                } catch {
+                    setCurrentUser(null);
+                }
+            } else {
+                setCurrentUser(null);
+            }
+
+            // Sinkronkan daftar komentar untuk setiap berita
+            setNewsData((prev) =>
+                prev.map((item) => {
+                    const storageKey = `comments_${item.slug}`;
+                    const saved = localStorage.getItem(storageKey);
+                    if (saved) {
+                        try {
+                            return { ...item, commentsList: JSON.parse(saved) };
+                        } catch {
+                            return item;
+                        }
+                    }
+                    return item;
+                })
+            );
+        };
+
+        syncData();
         setKeyword(searchQuery);
+        window.addEventListener("storage", syncData);
+        return () => window.removeEventListener("storage", syncData);
     }, [searchQuery]);
 
     const filteredNews = useMemo(() => {
@@ -99,10 +127,15 @@ function BeritaContent() {
                         author: currentUser.fullName,
                         authorEmail: currentUser.emailOrPhone,
                         text: text,
+                        status: "Menunggu Verifikasi" as const,
                     };
+                    const updatedList = [...item.commentsList, newComment];
+                    const storageKey = `comments_${item.slug}`;
+                    localStorage.setItem(storageKey, JSON.stringify(updatedList));
+                    window.dispatchEvent(new Event("storage"));
                     return {
                         ...item,
-                        commentsList: [...item.commentsList, newComment],
+                        commentsList: updatedList,
                     };
                 }
                 return item;
@@ -195,7 +228,7 @@ function BeritaContent() {
                                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                                 />
                                             ) : (
-                                                <span className="text-4xl group-hover:scale-110 transition-transform duration-300">📄</span>
+                                                <FileText className="w-10 h-10 text-[#9B4000] opacity-60 group-hover:scale-110 transition-transform duration-300" />
                                             )}
                                             <div className="absolute top-3 left-3 z-10">
                                                 <span className="bg-[#FDB659] text-[#724700] px-3 py-1 rounded-full text-[11px] font-bold uppercase shadow-xs">
