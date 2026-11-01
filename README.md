@@ -47,8 +47,6 @@ GEMINI_API_KEY=masukkan_api_key_gemini_anda_di_sini
 > 1. Kunjungi [Google AI Studio](https://aistudio.google.com/) dan masuk menggunakan akun Google Anda.
 > 2. Klik menu **"Get API key"** $\rightarrow$ **"Create API key"** (gratis).
 > 3. Masukkan kunci tersebut pada variabel `GEMINI_API_KEY` di dalam file `.env.local`.
-> 
-> *Catatan:* Jika aplikasi dijalankan tanpa API Key pun, sistem telah dilengkapi mekanisme **Smart Fallback** otomatis, sehingga asisten virtual tetap dapat merespons pertanyaan seputar isu kebijakan publik tanpa mengalami error.
 
 ### 4. Jalankan Development Server
 ```bash
