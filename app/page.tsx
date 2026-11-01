@@ -225,7 +225,7 @@ export default function HomePage() {
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                   />
                   {/* Efek Gradasi Gelap agar Teks Sangat Jelas Dibaca */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/30"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/75 to-black/45"></div>
                 </>
               )}
 
@@ -240,10 +240,10 @@ export default function HomePage() {
                   <span className="text-xs font-bold tracking-widest text-[#FFDDC9] uppercase drop-shadow-sm">
                     {featuredNews.category.name}
                   </span>
-                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug group-hover:text-[#FFDDC9] transition-colors drop-shadow-md">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug text-white group-hover:text-[#FFDDC9] transition-colors drop-shadow-md">
                     {featuredNews.title}
                   </h1>
-                  <p className="text-xs sm:text-sm text-[#FFF8F5]/90 leading-relaxed line-clamp-3 drop-shadow-sm">
+                  <p className="text-xs sm:text-sm text-[#FFF1E9] leading-relaxed line-clamp-3 drop-shadow-sm font-normal">
                     {featuredNews.excerpt}
                   </p>
                 </div>
