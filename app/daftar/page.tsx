@@ -56,7 +56,7 @@ export default function RegisterPage() {
                 options: {
                     data: {
                         full_name: fullName.trim(),
-                        role: "Warga Terverifikasi Nusantara",
+                        role: "Warga Terverifikasi",
                     },
                 },
             });
@@ -72,7 +72,7 @@ export default function RegisterPage() {
                     id: data.user.id,
                     fullName: fullName.trim(),
                     emailOrPhone: email.trim(),
-                    role: "Warga Terverifikasi Nusantara",
+                    role: "Warga Terverifikasi",
                     joinedDate: new Date().toLocaleDateString("id-ID", { day: 'numeric', month: 'long', year: 'numeric' }),
                 };
                 localStorage.setItem("current_user", JSON.stringify(userProfile));
@@ -130,7 +130,7 @@ export default function RegisterPage() {
                             className="w-10 h-10 object-contain rounded-xl shadow-xs"
                         />
                         <div>
-                            <span className="text-sm font-extrabold tracking-tight text-[#28180C]">WarTahu</span>
+                            <span className="text-sm font-extrabold tracking-tight text-[#28180C]">MelekIsu</span>
                             <p className="text-[10px] font-bold text-[#9B4000] tracking-wider uppercase">Integritas Demokrasi & Wacana Publik</p>
                         </div>
                     </div>

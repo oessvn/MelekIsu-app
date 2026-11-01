@@ -72,6 +72,7 @@ export const newsDatabase: NewsItem[] = [
         date: "16 Oktober 2025",
         duration: "5 Menit Baca",
         likes: 810,
+        image: "/images/rupiah.jpg",
         commentsList: []
     },
     {
@@ -85,6 +86,7 @@ export const newsDatabase: NewsItem[] = [
         date: "15 Oktober 2025",
         duration: "4 Menit Baca",
         likes: 650,
+        image: "/images/plts.webp",
         commentsList: []
     },
     {
@@ -98,6 +100,7 @@ export const newsDatabase: NewsItem[] = [
         date: "14 Oktober 2025",
         duration: "3 Menit Baca",
         likes: 530,
+        image: "/images/pupuk.jpg",
         commentsList: []
     }
 ];

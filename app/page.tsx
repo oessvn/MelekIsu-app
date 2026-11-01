@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 
-// Data dummy / fallback interaktif jika API dipanggil
+// Data berita dengan link gambar langsung yang dijamin langsung tampil
 const mockNews = [
   {
     id: "1",
@@ -13,6 +13,7 @@ const mockNews = [
     category: { name: "Infrastruktur Publik" },
     source: "Humas KCIC",
     publishedAt: "2025-10-18",
+    image: "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1200&q=80",
   },
   {
     id: "2",
@@ -22,6 +23,7 @@ const mockNews = [
     category: { name: "Ketahanan Pangan" },
     source: "Wawasan Agraria",
     publishedAt: "2025-10-18",
+    image: "https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=1200&q=80",
   },
   {
     id: "3",
@@ -31,6 +33,7 @@ const mockNews = [
     category: { name: "Pendidikan & Talenta" },
     source: "Inovasi Vokasi",
     publishedAt: "2025-10-17",
+    image: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=1200&q=80",
   },
   {
     id: "4",
@@ -40,13 +43,49 @@ const mockNews = [
     category: { name: "Tata Kelola Publik" },
     source: "Transparansi Keuangan",
     publishedAt: "2025-10-16",
+    image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80",
   },
 ];
 
 export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState("Semua");
 
-  // Filter berita berdasarkan kategori
+  // State Interaktif untuk Like & Komentar Fungsional
+  const [likesCount, setLikesCount] = useState(1280);
+  const [hasLiked, setHasLiked] = useState(false);
+  const [commentsList, setCommentsList] = useState([
+    { id: 1, user: "Budi Santoso", text: "Kebijakan integrasi transit ini sangat membantu mobilitas harian warga urban." },
+    { id: 2, user: "Siti Rahma", text: "Transparansi anggaran yang luar biasa, patut didukung penuh." },
+  ]);
+  const [newComment, setNewComment] = useState("");
+  const [showCommentBox, setShowCommentBox] = useState(false);
+
+  // Handler Like
+  const handleLikeClick = () => {
+    if (hasLiked) {
+      setLikesCount((prev) => prev - 1);
+      setHasLiked(false);
+    } else {
+      setLikesCount((prev) => prev + 1);
+      setHasLiked(true);
+    }
+  };
+
+  // Handler Tambah Komentar
+  const handleAddComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+
+    const commentObj = {
+      id: Date.now(),
+      user: "Indah (Warga Terverifikasi)",
+      text: newComment.trim(),
+    };
+
+    setCommentsList([commentObj, ...commentsList]);
+    setNewComment("");
+  };
+
   const filteredNews = useMemo(() => {
     return mockNews.filter((item) => {
       const matchesCategory =
@@ -61,11 +100,9 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#FFF8F5] text-[#28180C] selection:bg-[#FDB659]/30">
 
-      {/* Top Navigation Category Pills Section */}
+      {/* Top Navigation Category Pills */}
       <section className="sticky top-20 z-40 bg-[#FFF8F5]/90 backdrop-blur-md border-b border-[#DEC0B3]/30 shadow-sm">
         <div className="max-w-[1360px] mx-auto px-6 py-3 flex items-center justify-between">
-
-          {/* Category Pills */}
           <div className="flex items-center gap-2 overflow-x-auto w-full pb-1 md:pb-0 scrollbar-none">
             {["Semua", "Infrastruktur Publik", "Ketahanan Pangan", "Pendidikan & Talenta", "Tata Kelola Publik"].map((cat) => (
               <button
@@ -80,7 +117,6 @@ export default function HomePage() {
               </button>
             ))}
           </div>
-
         </div>
       </section>
 
@@ -91,10 +127,21 @@ export default function HomePage() {
         {featuredNews ? (
           <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
 
-            {/* Kolom Kiri: Visual Banner Utama */}
+            {/* Kolom Kiri: Kotak Banner Utama dengan Gambar Latar Belakang Asli */}
             <div className="lg:col-span-7 bg-[#9B4000] text-white rounded-3xl p-8 sm:p-10 flex flex-col justify-between shadow-lg relative overflow-hidden group">
-              {/* Aksen Dekoratif Latar Belakang */}
-              <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
+
+              {/* GAMBAR LATAR BELAKANG */}
+              {featuredNews.image && (
+                <>
+                  <img
+                    src={featuredNews.image}
+                    alt={featuredNews.title}
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  />
+                  {/* Efek Gradasi Gelap agar Teks Sangat Jelas Dibaca */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/30"></div>
+                </>
+              )}
 
               <div className="flex flex-col gap-6 relative z-10">
                 <div className="flex items-center gap-2">
@@ -104,13 +151,13 @@ export default function HomePage() {
                 </div>
 
                 <div className="space-y-3">
-                  <span className="text-xs font-bold tracking-widest text-[#FFDDC9] uppercase">
+                  <span className="text-xs font-bold tracking-widest text-[#FFDDC9] uppercase drop-shadow-sm">
                     {featuredNews.category.name}
                   </span>
-                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug group-hover:text-[#FFDDC9] transition-colors">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug group-hover:text-[#FFDDC9] transition-colors drop-shadow-md">
                     {featuredNews.title}
                   </h1>
-                  <p className="text-xs sm:text-sm text-[#FFF8F5]/90 leading-relaxed line-clamp-3">
+                  <p className="text-xs sm:text-sm text-[#FFF8F5]/90 leading-relaxed line-clamp-3 drop-shadow-sm">
                     {featuredNews.excerpt}
                   </p>
                 </div>
@@ -131,8 +178,8 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Kolom Kanan: Editorial Summary Card */}
-            <div className="lg:col-span-5 bg-white rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-sm border border-[#DEC0B3]/40 hover:shadow-md transition-all duration-300 group">
+            {/* Kolom Kanan: Editorial Summary Card dengan Like & Komentar Fungsional */}
+            <div className="lg:col-span-5 bg-white rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-sm border border-[#DEC0B3]/40 hover:shadow-md transition-all duration-300">
               <div className="flex flex-col gap-5">
                 <div className="flex items-center justify-between">
                   <span className="bg-[#FFDDC9] text-[#724700] px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide">
@@ -143,7 +190,7 @@ export default function HomePage() {
                   </span>
                 </div>
 
-                <h2 className="text-lg font-bold text-[#28180C] group-hover:text-[#9B4000] transition-colors leading-snug line-clamp-2">
+                <h2 className="text-lg font-bold text-[#28180C] hover:text-[#9B4000] transition-colors leading-snug line-clamp-2">
                   {featuredNews.title}
                 </h2>
 
@@ -161,13 +208,62 @@ export default function HomePage() {
                     <li>Partisipasi aktif warga melalui kanal kuota esai berbobot.</li>
                   </ul>
                 </div>
+
+                {/* Kotak Komentar Interaktif */}
+                {showCommentBox && (
+                  <div className="bg-[#FFF1E9] p-3 rounded-2xl border border-[#DEC0B3]/50 space-y-3">
+                    <div className="flex items-center justify-between text-xs font-bold text-[#9B4000]">
+                      <span>Tanggapan Warga ({commentsList.length})</span>
+                      <button onClick={() => setShowCommentBox(false)} className="text-[10px] text-[#8B7266] hover:text-[#28180C]">Tutup</button>
+                    </div>
+
+                    <form onSubmit={handleAddComment} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Tulis tanggapan berbobot..."
+                        className="flex-1 bg-white px-3 py-1.5 text-xs rounded-xl border border-[#DEC0B3] focus:outline-none focus:ring-1 focus:ring-[#9B4000]"
+                      />
+                      <button type="submit" className="px-3 py-1.5 bg-[#9B4000] text-white text-xs font-bold rounded-xl hover:bg-[#8C4A1E] cursor-pointer">
+                        Kirim
+                      </button>
+                    </form>
+
+                    <div className="max-h-28 overflow-y-auto space-y-2 pr-1">
+                      {commentsList.map((c) => (
+                        <div key={c.id} className="bg-white p-2 rounded-xl text-[11px] border border-[#DEC0B3]/30 shadow-xs">
+                          <strong className="text-[#9B4000] block">{c.user}</strong>
+                          <span className="text-[#574238]">{c.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
+              {/* Tombol Aksi Fungsional: Like & Komentar */}
               <div className="pt-5 mt-5 border-t border-[#DEC0B3]/20 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-4 text-[#574238]">
-                  <span className="flex items-center gap-1 font-semibold">💬 <strong className="text-[#28180C]">142</strong></span>
-                  <span className="flex items-center gap-1 font-semibold">👍 <strong className="text-[#28180C]">1,280</strong></span>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowCommentBox(!showCommentBox)}
+                    className="flex items-center gap-1 font-semibold text-[#574238] hover:text-[#9B4000] cursor-pointer bg-[#FFF1E9] px-3 py-1.5 rounded-xl transition-all"
+                  >
+                    💬 <strong className="text-[#28180C]">{commentsList.length}</strong>
+                  </button>
+
+                  <button
+                    onClick={handleLikeClick}
+                    className={`flex items-center gap-1.5 font-semibold px-3 py-1.5 rounded-xl transition-all cursor-pointer ${hasLiked
+                        ? "bg-[#9B4000] text-white shadow-sm"
+                        : "bg-[#FFF1E9] text-[#574238] hover:text-[#9B4000]"
+                      }`}
+                  >
+                    <span>👍</span>
+                    <strong className={hasLiked ? "text-white" : "text-[#28180C]"}>{likesCount}</strong>
+                  </button>
                 </div>
+
                 <Link
                   href={`/berita/${featuredNews.slug}`}
                   className="px-4 py-2 bg-[#9B4000] hover:bg-[#8C4A1E] text-white font-bold rounded-xl shadow-xs transition-all duration-300 flex items-center gap-1.5 cursor-pointer"
@@ -179,14 +275,7 @@ export default function HomePage() {
             </div>
 
           </section>
-        ) : (
-          <div className="text-center py-12 bg-white rounded-2xl border border-[#DEC0B3]/40">
-            <p className="text-base font-semibold text-[#574238]">Berita dalam kategori ini tidak ditemukan.</p>
-            <button onClick={() => setSelectedCategory("Semua")} className="mt-3 px-4 py-2 bg-[#9B4000] text-white text-xs font-bold rounded-xl cursor-pointer">
-              Reset Kategori
-            </button>
-          </div>
-        )}
+        ) : null}
 
         {/* Section Heading */}
         <div className="flex items-center justify-between pt-4 border-t border-[#DEC0B3]/40">
@@ -227,38 +316,13 @@ export default function HomePage() {
                 <span className="text-[11px] text-[#8B7266]">Wawasan Warga</span>
                 <Link
                   href={`/berita/${article.slug}`}
-                  className="text-xs text-[#9B4000] font-bold hover:text-[#8C4A1E] flex items-center gap-1"
+                  className="text-xs text-[#9B4000] font-bold hover:text-[#8C4A1E] flex items-center gap-1 cursor-pointer"
                 >
                   Baca Selengkapnya <span>→</span>
                 </Link>
               </div>
             </article>
           ))}
-        </section>
-
-        {/* Civic Discourse Etiquette Banner */}
-        <section className="relative bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-[#DEC0B3]/40 overflow-hidden flex flex-col lg:flex-row items-center justify-between gap-6">
-          <div className="absolute left-0 top-0 bottom-0 w-2.5 bg-[#9B4000]"></div>
-          <div className="flex items-start gap-4 pl-2">
-            <div className="hidden sm:flex shrink-0 w-12 h-12 rounded-full bg-[#FDB659]/20 text-[#9B4000] items-center justify-center text-xl font-bold">
-              💬
-            </div>
-            <div className="flex flex-col gap-1.5 max-w-2xl">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] bg-[#FDB659] text-[#724700] font-bold px-2 py-0.5 rounded-full">Etika Partisipasi Warga</span>
-                <span className="text-[11px] text-[#574238]">Kebijakan Anti-Disinformasi UU No. 1/2024</span>
-              </div>
-              <h3 className="text-base font-bold text-[#28180C]">Ruang Dialog Konstruktif: Kuota 1 Komentar Berbobot Per Artikel</h3>
-              <p className="text-xs text-[#574238] leading-relaxed">
-                Demi menjaga kedalaman argumen dan mencegah spam, setiap warga terverifikasi memiliki kuota 1 tanggapan berbobot per esai kebijakan.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0 w-full lg:w-auto justify-end">
-            <button className="w-full lg:w-auto px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#9B4000] hover:bg-[#8C4A1E] transition-all shadow-sm cursor-pointer">
-              Kirim Esai Opini Warga
-            </button>
-          </div>
         </section>
 
       </main>

@@ -59,7 +59,7 @@ export default function LoginPage() {
                     id: data.user.id,
                     fullName: data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "Warga",
                     emailOrPhone: data.user.email,
-                    role: data.user.user_metadata?.role || "Warga Terverifikasi Nusantara",
+                    role: data.user.user_metadata?.role || "Warga Terverifikasi",
                     joinedDate: new Date(data.user.created_at).toLocaleDateString("id-ID", { day: 'numeric', month: 'long', year: 'numeric' }),
                 };
                 localStorage.setItem("current_user", JSON.stringify(userProfile));
@@ -117,7 +117,7 @@ export default function LoginPage() {
                             className="w-10 h-10 object-contain rounded-xl shadow-xs"
                         />
                         <div>
-                            <span className="text-sm font-extrabold tracking-tight text-[#28180C]">NusantaraInsight</span>
+                            <span className="text-sm font-extrabold tracking-tight text-[#28180C]">MelekIsu</span>
                             <p className="text-[10px] font-bold text-[#9B4000] tracking-wider uppercase">Integritas Demokrasi & Wacana Publik</p>
                         </div>
                     </div>
