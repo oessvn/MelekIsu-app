@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { sendComment } from "@/lib/newsService";
 import { Lightbulb, MessageSquare, ThumbsUp, ArrowRight, FileText, CheckCircle2, Clock, Send, AlertCircle, HelpCircle } from "lucide-react";
 
 // Data berita dengan link gambar langsung yang dijamin langsung tampil
@@ -117,6 +118,21 @@ export default function HomePage() {
     return () => window.removeEventListener("storage", syncData);
   }, []);
 
+  // Filter komentar publik di Hero: Hanya Terverifikasi atau milik pengguna aktif
+  const isAuthorOfComment = (c: any) => {
+    if (!currentUser) return false;
+    const authorName = c.author || c.user;
+    if (currentUser.emailOrPhone && c.authorEmail && c.authorEmail.toLowerCase() === currentUser.emailOrPhone.toLowerCase()) return true;
+    if (currentUser.fullName && authorName && authorName.toLowerCase() === currentUser.fullName.toLowerCase()) return true;
+    return false;
+  };
+
+  const visibleHeroComments = commentsList.filter((c) => {
+    if (c.status === "Terverifikasi") return true;
+    if (isAuthorOfComment(c)) return true;
+    return false;
+  });
+
   // Handler Like
   const handleLikeClick = () => {
     if (hasLiked) {
@@ -148,28 +164,20 @@ export default function HomePage() {
   };
 
   // Handler Eksekusi Kirim (Menunggu Verifikasi)
-  const handleConfirmSend = () => {
+  const handleConfirmSend = async () => {
     if (!currentUser) return;
 
     setShowConfirmModal(false);
     setUserSubmissionCount(1);
 
-    const commentObj = {
-      id: `c-${Date.now()}`,
-      author: currentUser.fullName,
-      authorEmail: currentUser.emailOrPhone,
-      text: newComment.trim(),
-      status: "Menunggu Verifikasi",
-    };
+    const newCommentItem = await sendComment(
+      "revolusi-mobilitas-berkelanjutan",
+      currentUser.fullName,
+      currentUser.emailOrPhone || "",
+      newComment.trim()
+    );
 
-    const updated = [...commentsList, commentObj];
-    setCommentsList(updated);
-
-    // Simpan ke storage key bersama
-    const storageKey = "comments_revolusi-mobilitas-berkelanjutan";
-    localStorage.setItem(storageKey, JSON.stringify(updated));
-    window.dispatchEvent(new Event("storage"));
-
+    setCommentsList((prev) => [...prev, newCommentItem]);
     setNewComment("");
     setShowSuccessModal(true);
   };
@@ -329,31 +337,54 @@ export default function HomePage() {
                       </form>
                     )}
 
-                    <div className="max-h-36 overflow-y-auto space-y-2 pr-1">
-                      {commentsList.map((c) => {
+                    {/* List Komentar Interaktif */}
+                    {(() => {
+                      const isAuthorOfComment = (c: any) => {
+                        if (!currentUser) return false;
                         const authorName = c.author || c.user;
-                        const isPending = c.status === "Menunggu Verifikasi";
-                        return (
-                          <div key={c.id} className="bg-white p-3 rounded-xl text-xs border border-[#DEC0B3]/30 shadow-2xs space-y-1">
-                            <div className="flex items-center justify-between gap-1">
-                              <strong className="text-[#9B4000] text-xs truncate">{authorName}</strong>
-                              {isPending ? (
-                                <span className="text-[10px] text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shrink-0">
-                                  <Clock className="w-2.5 h-2.5 text-amber-700 animate-pulse" />
-                                  <span>Menunggu Verifikasi</span>
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shrink-0">
-                                  <CheckCircle2 className="w-2.5 h-2.5 text-emerald-700" />
-                                  <span>Terverifikasi</span>
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[#574238] text-[11px] leading-relaxed">{c.text}</p>
-                          </div>
-                        );
-                      })}
-                    </div>
+                        if (currentUser.emailOrPhone && c.authorEmail && c.authorEmail.toLowerCase() === currentUser.emailOrPhone.toLowerCase()) return true;
+                        if (currentUser.fullName && authorName && authorName.toLowerCase() === currentUser.fullName.toLowerCase()) return true;
+                        return false;
+                      };
+
+                      const visibleComments = commentsList.filter((c) => {
+                        if (c.status === "Terverifikasi") return true;
+                        if (isAuthorOfComment(c)) return true;
+                        return false;
+                      });
+
+                      return (
+                        <div className="max-h-36 overflow-y-auto space-y-2 pr-1">
+                          {visibleComments.length === 0 ? (
+                            <p className="text-[11px] text-[#8B7266] italic text-center py-2">Belum ada tanggapan warga yang terverifikasi.</p>
+                          ) : (
+                            visibleComments.map((c) => {
+                              const authorName = c.author || c.user;
+                              const isPending = c.status === "Menunggu Verifikasi";
+                              return (
+                                <div key={c.id} className="bg-white p-3 rounded-xl text-xs border border-[#DEC0B3]/30 shadow-2xs space-y-1">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <strong className="text-[#9B4000] text-xs truncate">{authorName}</strong>
+                                    {isPending ? (
+                                      <span className="text-[10px] text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shrink-0" title="Komentar hanya terlihat oleh Anda sampai disetujui admin">
+                                        <Clock className="w-2.5 h-2.5 text-amber-700 animate-pulse" />
+                                        <span>Menunggu Verifikasi (Hanya Anda)</span>
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shrink-0">
+                                        <CheckCircle2 className="w-2.5 h-2.5 text-emerald-700" />
+                                        <span>Terverifikasi</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[#574238] text-[11px] leading-relaxed">{c.text}</p>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -366,7 +397,7 @@ export default function HomePage() {
                     className="flex items-center gap-1.5 font-semibold text-[#574238] hover:text-[#9B4000] cursor-pointer bg-[#FFF1E9] px-3 py-1.5 rounded-xl transition-all"
                   >
                     <MessageSquare className="w-3.5 h-3.5 text-[#9B4000]" />
-                    <strong className="text-[#28180C]">{commentsList.length}</strong>
+                    <strong className="text-[#28180C]">{visibleHeroComments.length}</strong>
                   </button>
 
                   <button

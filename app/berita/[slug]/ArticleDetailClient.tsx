@@ -3,41 +3,49 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, MessageSquare, ThumbsUp, Send, AlertCircle, Building2, Calendar, Clock, CheckCircle2, HelpCircle, FileText, Bot, Sparkles } from "lucide-react";
-import { newsDatabase } from "@/data/news";
+import { getCombinedNews, getCommentsForSlug, sendComment } from "@/lib/newsService";
+import { NewsItem, NewsComment } from "@/data/news";
 
 export default function ArticleDetailClient({ slug }: { slug: string }) {
-    const articleData = newsDatabase.find((item) => item.slug === slug);
+    const [articleData, setArticleData] = useState<NewsItem | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const [likes, setLikes] = useState(articleData ? articleData.likes : 0);
+    const [likes, setLikes] = useState(0);
     const [isLiked, setIsLiked] = useState(false);
-    const [comments, setComments] = useState<any[]>([]);
+    const [comments, setComments] = useState<NewsComment[]>([]);
     const [newComment, setNewComment] = useState("");
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [userSubmissionCount, setUserSubmissionCount] = useState(0);
+    const [isSending, setIsSending] = useState(false);
 
     // State untuk Modal Kustom
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+    // 1. Ambil data artikel
+    useEffect(() => {
+        let isMounted = true;
+        getCombinedNews().then((allNews) => {
+            if (!isMounted) return;
+            const found = allNews.find((item) => item.slug === slug);
+            if (found) {
+                setArticleData(found);
+                setLikes(found.likes || 0);
+            }
+            setIsLoading(false);
+        });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [slug]);
+
+    // 2. Sinkronkan komentar & kuota pengguna
     useEffect(() => {
         if (!articleData) return;
 
-        const syncComments = () => {
-            const storageKey = `comments_${articleData.slug}`;
-            const saved = localStorage.getItem(storageKey);
-            let list: any[] = [];
-
-            if (saved) {
-                try {
-                    list = JSON.parse(saved);
-                } catch {
-                    list = articleData.commentsList;
-                }
-            } else {
-                list = articleData.commentsList;
-                localStorage.setItem(storageKey, JSON.stringify(list));
-            }
-
+        const syncComments = async () => {
+            const list = await getCommentsForSlug(articleData.slug);
             setComments(list);
 
             const activeUser = localStorage.getItem("current_user");
@@ -63,6 +71,17 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
         return () => window.removeEventListener("storage", syncComments);
     }, [articleData]);
 
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-[#FFF8F5] flex items-center justify-center text-[#9B4000]">
+                <div className="flex flex-col items-center gap-2">
+                    <div className="w-8 h-8 border-3 border-[#9B4000] border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-xs font-bold tracking-wider uppercase">Memuat Artikel...</span>
+                </div>
+            </div>
+        );
+    }
+
     if (!articleData) {
         return (
             <div className="min-h-screen bg-[#FFF8F5] flex flex-col items-center justify-center p-6 text-center">
@@ -75,6 +94,23 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
         );
     }
 
+    // Helper cek kepemilikan komentar
+    const isAuthorOfComment = (c: NewsComment) => {
+        if (!currentUser) return false;
+        if (currentUser.emailOrPhone && c.authorEmail && c.authorEmail.toLowerCase() === currentUser.emailOrPhone.toLowerCase()) return true;
+        if (currentUser.fullName && c.author && c.author.toLowerCase() === currentUser.fullName.toLowerCase()) return true;
+        return false;
+    };
+
+    // Filter komentar untuk tampilan publik:
+    // - Komentar "Terverifikasi": tampil untuk seluruh warga publik
+    // - Komentar "Menunggu Verifikasi": HANYA tampil untuk pembuat komentar tersebut (agar tahu sedang diproses), user lain TIDAK BISA melihatnya
+    const visibleComments = comments.filter((c) => {
+        if (c.status === "Terverifikasi") return true;
+        if (isAuthorOfComment(c)) return true;
+        return false;
+    });
+
     const handleToggleLike = () => {
         if (isLiked) {
             setLikes(likes - 1);
@@ -85,7 +121,6 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
         }
     };
 
-    // 1. Dipanggil saat tombol Kirim diklik (Memicu Modal Konfirmasi Kustom)
     const handleInitialSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -101,34 +136,26 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
             return;
         }
 
-        // Tampilkan modal konfirmasi kustom yang interaktif
         setShowConfirmModal(true);
     };
 
-    // 2. Dipanggil jika user menekan tombol "Ya, Kirim Sekarang" pada modal kustom
-    const handleConfirmSend = () => {
+    const handleConfirmSend = async () => {
+        if (!currentUser || !articleData) return;
+
         setShowConfirmModal(false);
+        setIsSending(true);
+
+        const newCommentItem = await sendComment(
+            articleData.slug,
+            currentUser.fullName,
+            currentUser.emailOrPhone || "",
+            newComment.trim()
+        );
+
+        setComments((prev) => [...prev, newCommentItem]);
         setUserSubmissionCount(1);
-
-        const newEntry = {
-            id: `c-${Date.now()}`,
-            author: currentUser.fullName,
-            authorEmail: currentUser.emailOrPhone,
-            text: newComment.trim(),
-            status: "Menunggu Verifikasi" as const,
-        };
-
-        const updatedComments = [...comments, newEntry];
-        setComments(updatedComments);
-
-        if (articleData) {
-            articleData.commentsList = updatedComments;
-            const storageKey = `comments_${articleData.slug}`;
-            localStorage.setItem(storageKey, JSON.stringify(updatedComments));
-            window.dispatchEvent(new Event("storage"));
-        }
-
         setNewComment("");
+        setIsSending(false);
         setShowSuccessModal(true);
     };
 
@@ -142,142 +169,87 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
 
     return (
         <div className="min-h-screen bg-[#FFF8F5] text-[#28180C] selection:bg-[#FDB659]/30 py-10 px-6 relative">
+            <div className="max-w-4xl mx-auto flex flex-col gap-8">
+                {/* Back button */}
+                <Link
+                    href="/berita"
+                    className="inline-flex items-center gap-2 text-xs font-bold text-[#8B7266] hover:text-[#9B4000] transition-colors self-start"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Kembali ke Indeks Berita</span>
+                </Link>
 
-            {/* --- MODAL KONFIRMASI KUSTOM (Interaktif) --- */}
-            {showConfirmModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-[#DEC0B3]/40 flex flex-col items-center text-center gap-5">
-                        <div className="w-16 h-16 rounded-full bg-[#FFF1E9] text-[#9B4000] flex items-center justify-center shadow-inner">
-                            <HelpCircle className="w-9 h-9 text-[#9B4000]" />
-                        </div>
-                        <div className="space-y-2">
-                            <h3 className="text-xl font-extrabold text-[#28180C]">Konfirmasi Pengiriman Tanggapan</h3>
-                            <p className="text-xs sm:text-sm text-[#574238] leading-relaxed">
-                                Perhatian: Setiap warga hanya dapat mengirimkan <strong className="text-[#9B4000]">1 komentar</strong> per artikel dan tidak dapat diubah kembali. Tanggapan Anda akan melalui proses verifikasi sistem. Lanjutkan kirim?
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-3 w-full pt-2">
-                            <button
-                                onClick={() => setShowConfirmModal(false)}
-                                className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
-                            >
-                                Batalkan
-                            </button>
-                            <button
-                                onClick={handleConfirmSend}
-                                className="flex-1 py-3 px-4 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
-                            >
-                                Ya, Kirim Sekarang
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* --- MODAL SUKSES KUSTOM --- */}
-            {showSuccessModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-[#DEC0B3]/40 flex flex-col items-center text-center gap-5">
-                        <div className="w-16 h-16 rounded-full bg-[#FFF1E9] text-[#9B4000] flex items-center justify-center shadow-inner">
-                            <CheckCircle2 className="w-9 h-9 text-[#9B4000]" />
-                        </div>
-                        <div className="space-y-2">
-                            <h3 className="text-xl font-extrabold text-[#28180C]">Tanggapan Berhasil Dikirim</h3>
-                            <p className="text-xs sm:text-sm text-[#574238] leading-relaxed">
-                                Terima kasih atas partisipasi Anda. Komentar Anda sedang menunggu verifikasi sistem sebelum ditampilkan secara publik.
-                            </p>
-                        </div>
-                        <button
-                            onClick={() => setShowSuccessModal(false)}
-                            className="w-full mt-2 py-3 px-5 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
-                        >
-                            Mengerti & Tutup
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Bagian Utama Konten */}
-            <div className="max-w-[900px] mx-auto flex flex-col gap-8">
-                <div>
-                    <Link href="/berita" className="inline-flex items-center gap-2 text-xs font-bold text-[#9B4000] hover:text-[#8C4A1E] bg-white px-4 py-2 rounded-xl border border-[#DEC0B3]/40 shadow-xs transition-all">
-                        <ArrowLeft className="w-4 h-4" />
-                        <span>Kembali ke Berita</span>
-                    </Link>
-                </div>
-
-                {/* Artikel */}
-                <article className="bg-white rounded-2xl p-8 sm:p-10 shadow-sm border border-[#DEC0B3]/40 flex flex-col gap-6">
+                {/* Article Header */}
+                <header className="space-y-4">
                     <div className="flex flex-wrap items-center gap-3">
-                        <span className="bg-[#FFDDC9] text-[#724700] px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide">
+                        <span className="bg-[#FFE3D1] text-[#9B4000] text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
                             {articleData.category}
                         </span>
-                        <span className="text-xs text-[#8B7266] flex items-center gap-1 font-medium">
-                            <Building2 className="w-3.5 h-3.5" /> {articleData.source}
-                        </span>
-                        <span className="text-xs text-[#8B7266] flex items-center gap-1 font-medium">
-                            <Calendar className="w-3.5 h-3.5" /> {articleData.date}
-                        </span>
-                        <span className="text-xs text-[#8B7266] flex items-center gap-1 font-medium">
-                            <Clock className="w-3.5 h-3.5" /> {articleData.duration}
-                        </span>
+                        <div className="flex items-center gap-1.5 text-xs text-[#8B7266]">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>{articleData.duration}</span>
+                        </div>
+                        <span className="text-xs text-[#DEC0B3]">•</span>
+                        <div className="flex items-center gap-1.5 text-xs text-[#8B7266]">
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span>{articleData.date}</span>
+                        </div>
                     </div>
 
-                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#28180C] leading-tight tracking-tight">
+                    <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#28180C] leading-snug">
                         {articleData.title}
                     </h1>
 
-                    <div className="w-full h-64 sm:h-80 relative rounded-xl overflow-hidden shadow-inner bg-[#F3D4c1]">
-                        {articleData.image ? (
-                            <img src={articleData.image} alt={articleData.title} className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-[#9B4000]">
-                                <FileText className="w-16 h-16 text-[#9B4000] opacity-50" />
-                            </div>
-                        )}
+                    <div className="flex items-center gap-2 text-xs text-[#8B7266] pt-1">
+                        <Building2 className="w-4 h-4 text-[#9B4000]" />
+                        <span>Sumber Rujukan Kebijakan: <strong className="text-[#28180C]">{articleData.source}</strong></span>
+                    </div>
+                </header>
+
+                {/* Cover Image */}
+                <div className="relative w-full h-[280px] sm:h-[420px] rounded-3xl overflow-hidden shadow-md border border-[#DEC0B3]/40 bg-gradient-to-tr from-[#F3D4C1] to-[#FFF8F5] flex items-center justify-center">
+                    {articleData.image ? (
+                        <img
+                            src={articleData.image}
+                            alt={articleData.title}
+                            className="w-full h-full object-cover"
+                        />
+                    ) : (
+                        <FileText className="w-16 h-16 text-[#9B4000] opacity-50" />
+                    )}
+                </div>
+
+                {/* Article Body Content */}
+                <article className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-[#DEC0B3]/40 leading-relaxed text-[#574238] text-sm sm:text-base space-y-6">
+                    <p className="font-semibold text-[#28180C] leading-relaxed border-l-4 border-[#9B4000] pl-4 italic">
+                        {articleData.excerpt}
+                    </p>
+
+                    <div className="space-y-4 pt-2 whitespace-pre-line">
+                        {articleData.content}
                     </div>
 
-                    <div className="text-[#574238] text-sm sm:text-base leading-relaxed space-y-4 pt-2">
-                        {articleData.content.split("\n\n").map((paragraph, index) => (
-                            <p key={index}>{paragraph}</p>
-                        ))}
-                    </div>
+                    <div className="pt-6 border-t border-[#DEC0B3]/30 flex flex-wrap items-center justify-between gap-4">
+                        <span className="text-xs text-[#8B7266]">
+                            Diterbitkan oleh <strong className="text-[#28180C]">{articleData.source}</strong> untuk transparansi publik.
+                        </span>
 
-                    {/* --- BAGIAN ATRIBUSI SUMBER / RUJUKAN ASLI --- */}
-                    <div className="bg-[#FFF1E9] p-4 rounded-xl border border-[#DEC0B3]/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-4">
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-[#9B4000]">Sumber Rujukan Asli:</span>
-                            <span className="text-xs text-[#574238] font-medium">
-                                {articleData.source || "Portal Berita Publik Terverifikasi"}
-                            </span>
-                        </div>
-                        {(articleData as any).sourceUrl && (
-                            <a
-                                href={(articleData as any).sourceUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs font-bold text-white bg-[#9B4000] hover:bg-[#8C4A1E] px-3.5 py-1.5 rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                            >
-                                <span>Kunjungi Laman Asli</span>
-                                <span>↗</span>
-                            </a>
-                        )}
-                    </div>
-
-                    <div className="pt-6 mt-6 border-t border-[#DEC0B3]/30 flex items-center justify-between">
+                        {/* Tombol Suka / Like */}
                         <button
                             onClick={handleToggleLike}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${isLiked ? "bg-[#FFDDC9] text-[#9B4000] shadow-xs" : "bg-[#FFF1E9] hover:bg-[#FFE3D1] text-[#574238]"
-                                }`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                isLiked
+                                    ? "bg-[#FFE3D1] text-[#9B4000] border border-[#9B4000]/40 shadow-xs"
+                                    : "bg-[#FFF8F5] text-[#574238] border border-[#DEC0B3]/60 hover:bg-[#FFE3D1]"
+                            }`}
                         >
                             <ThumbsUp className={`w-4 h-4 ${isLiked ? "fill-[#9B4000] text-[#9B4000]" : ""}`} />
-                            <span>{isLiked ? "Apresiasi Diberikan" : "Beri Apresiasi"} ({likes})</span>
+                            <span>{likes} Apresiasi Warga</span>
                         </button>
-                        <span className="text-xs text-[#8B7266]">Bagikan wawasan ini untuk transparansi publik</span>
                     </div>
                 </article>
 
-                {/* --- KOTAK INTERAKTIF: TANYA ASISTEN AI TENTANG BERITA INI --- */}
+                {/* Kotak Tanya Asisten AI */}
                 {articleData && (
                     <div className="bg-gradient-to-br from-[#FFF1E9] via-white to-[#FFEDE3] rounded-2xl p-6 sm:p-7 border border-[#DEC0B3]/70 shadow-sm flex flex-col gap-4">
                         <div className="flex items-start gap-3.5">
@@ -323,79 +295,180 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
                     </div>
                 )}
 
-                {/* Komentar */}
+                {/* Bagian Komentar */}
                 <section className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-[#DEC0B3]/40 flex flex-col gap-6">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-[#DEC0B3]/30 pb-4 gap-2">
-                        <div className="flex items-center gap-2">
-                            <MessageSquare className="w-5 h-5 text-[#9B4000]" />
-                            <h3 className="text-base font-bold text-[#28180C]">Ruang Diskusi & Tanggapan Warga</h3>
+                        <div>
+                            <h2 className="text-lg font-bold text-[#28180C] flex items-center gap-2">
+                                <MessageSquare className="w-5 h-5 text-[#9B4000]" />
+                                <span>Ruang Diskusi & Tanggapan Warga ({visibleComments.length})</span>
+                            </h2>
+                            <p className="text-xs text-[#8B7266] mt-0.5">
+                                Partisipasi publik yang berbobot untuk keterbukaan kebijakan.
+                            </p>
                         </div>
-                        <span className="text-xs bg-[#FFDDC9] text-[#724700] px-3 py-1 rounded-full font-bold">
-                            Sisa Kuota Anda di Berita Ini: {1 - userSubmissionCount}/1
-                        </span>
-                    </div>
 
-                    <div className="flex flex-col gap-3">
-                        {comments.length === 0 ? (
-                            <p className="text-xs text-[#8B7266] italic py-4 text-center">Belum ada tanggapan yang disetujui pada artikel ini. Jadilah yang pertama!</p>
-                        ) : (
-                            comments.map((c: any) => (
-                                <div key={c.id} className="bg-[#FFF8F5] p-4 rounded-xl border border-[#DEC0B3]/30 flex flex-col gap-1">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-bold text-[#9B4000]">{c.author}</span>
-                                        {c.status === "Menunggu Verifikasi" ? (
-                                            <span className="text-[10px] text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-2xs">
-                                                <Clock className="w-3 h-3 text-amber-700 animate-pulse" />
-                                                <span>Menunggu Verifikasi</span>
-                                            </span>
-                                        ) : (
-                                            <span className="text-[10px] text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-2xs">
-                                                <CheckCircle2 className="w-3 h-3 text-emerald-700" />
-                                                <span>Terverifikasi</span>
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="text-xs sm:text-sm text-[#28180C] leading-normal">{c.text}</p>
-                                </div>
-                            ))
+                        {currentUser && (
+                            <div className="bg-[#FFF8F5] px-3 py-1.5 rounded-xl border border-[#DEC0B3]/40 text-xs">
+                                <span className="text-[#8B7266]">Sisa Kuota Anda: </span>
+                                <strong className="text-[#9B4000]">{userSubmissionCount >= 1 ? "0 / 1" : "1 / 1"} Tanggapan</strong>
+                            </div>
                         )}
                     </div>
 
-                    {!currentUser ? (
-                        <div className="text-xs text-[#9B4000] bg-[#FFF1E9] p-3 rounded-xl border border-[#DEC0B3]/60 text-center font-bold">
-                            Silakan <Link href="/masuk" className="underline">Masuk</Link> terlebih dahulu untuk mengirimkan 1 tanggapan berbobot Anda.
-                        </div>
-                    ) : userSubmissionCount < 1 ? (
-                        <form onSubmit={handleInitialSubmit} className="flex flex-col gap-3 pt-2">
-                            <label className="text-xs font-bold text-[#28180C]" htmlFor="commentInput">
-                                Kirim Tanggapan / Esai Singkat Kebijakan ({1 - userSubmissionCount} kesempatan tersisa):
-                            </label>
-                            <div className="flex gap-2">
-                                <input
-                                    id="commentInput"
-                                    type="text"
-                                    value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
-                                    placeholder="Tuliskan pandangan konstruktif Anda..."
-                                    className="flex-1 bg-[#FFF1E9]/60 px-4 py-2.5 text-xs sm:text-sm rounded-xl border border-[#DEC0B3]/60 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#9B4000]"
-                                />
-                                <button
-                                    type="submit"
-                                    className="px-5 py-2.5 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
-                                >
-                                    <Send className="w-3.5 h-3.5" />
-                                    <span>Kirim</span>
-                                </button>
+                    {/* List Komentar */}
+                    <div className="space-y-4">
+                        {visibleComments.length === 0 ? (
+                            <div className="text-center py-8 text-xs text-[#8B7266] italic">
+                                Belum ada tanggapan untuk berita ini. Jadilah warga pertama yang menyampaikan masukan berbobot!
                             </div>
-                        </form>
-                    ) : (
-                        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-2 text-xs text-amber-800">
-                            <AlertCircle className="w-4 h-4 shrink-0" />
-                            <span>Anda telah menggunakan batas 1 kesempatan mengirim tanggapan pada artikel berita ini. Komentar Anda sedang menunggu verifikasi sistem.</span>
-                        </div>
-                    )}
+                        ) : (
+                            visibleComments.map((c) => {
+                                const isPending = c.status === "Menunggu Verifikasi";
+                                return (
+                                    <div
+                                        key={c.id}
+                                        className={`p-4 rounded-xl border transition-all ${
+                                            isPending
+                                                ? "bg-amber-50/40 border-amber-200"
+                                                : "bg-[#FFF8F5]/60 border-[#DEC0B3]/30"
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-bold text-[#28180C]">
+                                                {c.author}
+                                            </span>
+                                            {isPending ? (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200" title="Komentar hanya terlihat oleh Anda sampai disetujui oleh admin">
+                                                    <Clock className="w-3 h-3 text-amber-600 animate-pulse" />
+                                                    <span>Menunggu Verifikasi (Hanya Anda)</span>
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                                    <span>Terverifikasi</span>
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs sm:text-sm text-[#574238] leading-relaxed">
+                                            {c.text}
+                                        </p>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+
+                    {/* Form Input Komentar */}
+                    <div className="pt-4 border-t border-[#DEC0B3]/30">
+                        {!currentUser ? (
+                            <div className="bg-[#FFF8F5] p-5 rounded-2xl border border-[#DEC0B3]/50 text-center space-y-2">
+                                <p className="text-xs text-[#574238]">
+                                    Silakan masuk dengan akun warga Anda untuk memberikan tanggapan kebijakan.
+                                </p>
+                                <Link
+                                    href="/masuk"
+                                    className="inline-block px-5 py-2 bg-[#9B4000] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#8C4A1E] transition-all"
+                                >
+                                    Masuk ke Akun Warga
+                                </Link>
+                            </div>
+                        ) : userSubmissionCount >= 1 ? (
+                            <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200 flex items-start gap-3 text-xs text-amber-900">
+                                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <div>
+                                    <span className="font-bold block">Kuota Tanggapan Anda Telah Terpakai</span>
+                                    <span className="text-[#574238] mt-0.5 block">
+                                        Untuk menjaga ruang diskusi yang adil dan berimbang, setiap warga hanya dapat mengirimkan 1 tanggapan per artikel. Tanggapan Anda saat ini sedang dalam antrean verifikasi redaksi.
+                                    </span>
+                                </div>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleInitialSubmit} className="space-y-3">
+                                <div>
+                                    <label className="text-xs font-bold text-[#28180C] block mb-1">
+                                        Tuliskan Tanggapan Konstruktif Anda ({currentUser.fullName}):
+                                    </label>
+                                    <textarea
+                                        rows={3}
+                                        value={newComment}
+                                        onChange={(e) => setNewComment(e.target.value)}
+                                        placeholder="Sampaikan analisis, masukan, atau kritik kebijakan yang berbobot dan sopan..."
+                                        className="w-full p-3.5 bg-[#FFF8F5] rounded-xl border border-[#DEC0B3]/60 text-xs focus:outline-none focus:border-[#9B4000] text-[#28180C]"
+                                    />
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[11px] text-[#8B7266] italic">
+                                        *Tanggapan Anda akan ditinjau redaksi sebelum tampil publik.
+                                    </span>
+                                    <button
+                                        type="submit"
+                                        disabled={isSending}
+                                        className="px-5 py-2 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                    >
+                                        <Send className="w-3.5 h-3.5" />
+                                        <span>{isSending ? "Mengirim..." : "Kirim Tanggapan"}</span>
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+                    </div>
                 </section>
             </div>
+
+            {/* Modal Konfirmasi */}
+            {showConfirmModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-[#DEC0B3]/40 flex flex-col items-center text-center gap-5">
+                        <div className="w-16 h-16 rounded-full bg-[#FFF1E9] text-[#9B4000] flex items-center justify-center shadow-inner">
+                            <HelpCircle className="w-9 h-9 text-[#9B4000]" />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-xl font-extrabold text-[#28180C]">Konfirmasi Pengiriman Tanggapan</h3>
+                            <p className="text-xs sm:text-sm text-[#574238] leading-relaxed">
+                                Setiap warga hanya dapat mengirimkan <strong className="text-[#9B4000]">1 tanggapan</strong> per artikel. Tanggapan Anda akan berstatus <span className="text-amber-800 font-bold">Menunggu Verifikasi</span>. Lanjutkan kirim?
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-3 w-full pt-2">
+                            <button
+                                onClick={() => setShowConfirmModal(false)}
+                                className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                            >
+                                Batalkan
+                            </button>
+                            <button
+                                onClick={handleConfirmSend}
+                                className="flex-1 py-3 px-4 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                            >
+                                Ya, Kirim Sekarang
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Sukses */}
+            {showSuccessModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-[#DEC0B3]/40 flex flex-col items-center text-center gap-5">
+                        <div className="w-16 h-16 rounded-full bg-[#FFF1E9] text-[#9B4000] flex items-center justify-center shadow-inner">
+                            <CheckCircle2 className="w-9 h-9 text-[#9B4000]" />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-xl font-extrabold text-[#28180C]">Tanggapan Terkirim!</h3>
+                            <p className="text-xs sm:text-sm text-[#574238] leading-relaxed">
+                                Terima kasih atas partisipasi aktif Anda. Tanggapan Anda telah tercatat dan masuk ke antrean verifikasi redaksi di dashboard admin.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setShowSuccessModal(false)}
+                            className="w-full mt-2 py-3 px-5 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                        >
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
