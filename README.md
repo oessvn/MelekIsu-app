@@ -20,8 +20,8 @@ Ikuti panduan berikut untuk menjalankan project di komputer lokal:
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/oessvn/MelekIsu-app.git
-cd MelekIsu-app
+git clone https://github.com/oessvn/WarTahu-app.git
+cd WarTahu-app
 ```
 
 ### 2. Install Dependencies

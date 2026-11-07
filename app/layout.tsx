@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Navbar from "@/components/Navbar";
@@ -34,7 +35,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Footer />
 
         {/* Widget Chatbot AI Asisten Kebijakan Publik */}
-        <AIChatWidget />
+        <Suspense fallback={null}>
+          <AIChatWidget />
+        </Suspense>
       </body>
     </html>
   );

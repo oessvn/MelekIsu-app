@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, MessageSquare, ThumbsUp, Send, AlertCircle, Building2, Calendar, Clock, CheckCircle2, HelpCircle, FileText } from "lucide-react";
+import { ArrowLeft, MessageSquare, ThumbsUp, Send, AlertCircle, Building2, Calendar, Clock, CheckCircle2, HelpCircle, FileText, Bot, Sparkles } from "lucide-react";
 import { newsDatabase } from "@/data/news";
 
 export default function ArticleDetailClient({ slug }: { slug: string }) {
@@ -130,6 +130,14 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
 
         setNewComment("");
         setShowSuccessModal(true);
+    };
+
+    const handleAskAI = (prompt: string) => {
+        window.dispatchEvent(
+            new CustomEvent("open-ai-chat", {
+                detail: { prompt, slug: articleData?.slug },
+            })
+        );
     };
 
     return (
@@ -268,6 +276,52 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
                         <span className="text-xs text-[#8B7266]">Bagikan wawasan ini untuk transparansi publik</span>
                     </div>
                 </article>
+
+                {/* --- KOTAK INTERAKTIF: TANYA ASISTEN AI TENTANG BERITA INI --- */}
+                {articleData && (
+                    <div className="bg-gradient-to-br from-[#FFF1E9] via-white to-[#FFEDE3] rounded-2xl p-6 sm:p-7 border border-[#DEC0B3]/70 shadow-sm flex flex-col gap-4">
+                        <div className="flex items-start gap-3.5">
+                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#9B4000] to-[#803500] text-white flex items-center justify-center shrink-0 shadow-md">
+                                <Bot className="w-5 h-5" />
+                            </div>
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-sm sm:text-base font-extrabold text-[#28180C]">
+                                        Tanya Asisten AI tentang Berita Ini
+                                    </h3>
+                                    <span className="text-[10px] bg-[#9B4000] text-white font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                                        <Sparkles className="w-2.5 h-2.5 text-[#FDB659]" /> MelekIsu AI
+                                    </span>
+                                </div>
+                                <p className="text-xs text-[#574238] leading-relaxed">
+                                    Punya pertanyaan spesifik, butuh ringkasan kilat, atau ingin menganalisis dampak kebijakan dari artikel ini? Pilih pertanyaan cepat di bawah atau buka kotak chat:
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#DEC0B3]/40">
+                            <span className="text-xs font-bold text-[#8B7266] mr-1">Pertanyaan Cepat:</span>
+                            <button
+                                onClick={() => handleAskAI(`Tolong berikan ringkasan poin-poin penting dari berita "${articleData.title}"`)}
+                                className="text-xs font-semibold bg-white hover:bg-[#FFDDC9] text-[#9B4000] px-3.5 py-1.5 rounded-xl border border-[#DEC0B3]/70 shadow-2xs transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1.5"
+                            >
+                                <span>⚡ Ringkas Berita</span>
+                            </button>
+                            <button
+                                onClick={() => handleAskAI(`Apa dampak dan manfaat nyata kebijakan dalam berita "${articleData.title}" bagi masyarakat?`)}
+                                className="text-xs font-semibold bg-white hover:bg-[#FFDDC9] text-[#9B4000] px-3.5 py-1.5 rounded-xl border border-[#DEC0B3]/70 shadow-2xs transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1.5"
+                            >
+                                <span>👥 Dampak bagi Warga</span>
+                            </button>
+                            <button
+                                onClick={() => handleAskAI(`Siapa pihak berwenang terkait dan bagaimana tindak lanjut dari artikel "${articleData.title}"?`)}
+                                className="text-xs font-semibold bg-white hover:bg-[#FFDDC9] text-[#9B4000] px-3.5 py-1.5 rounded-xl border border-[#DEC0B3]/70 shadow-2xs transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1.5"
+                            >
+                                <span>🔍 Pihak Terkait & Regulasi</span>
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Komentar */}
                 <section className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-[#DEC0B3]/40 flex flex-col gap-6">
