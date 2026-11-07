@@ -114,6 +114,7 @@ PEDOMAN MENJAWAB:
 5. Ketika merujuk atau merekomendasikan artikel, selalu sertakan tautan markdown dengan format: [Judul Berita](/berita/{slug-berita}).
 6. Jika pengguna bertanya tentang kebijakan publik secara umum yang relevan, jawab secara bijak dengan perspektif transparansi publik dan hubungkan dengan berita di MelekIsu jika memungkinkan.
 7. Jangan membuat berita bohong atau berhalusinasi di luar data yang ada.
+8. Pastikan setiap jawabanmu tuntas dan selesai secara utuh hingga akhir, tidak terpotong di tengah kalimat.
 
 ---
 DATABASE RESMI BERITA MELEKISU:
@@ -183,7 +184,10 @@ PENTING: Jika pertanyaan warga merujuk pada "berita ini", "artikel ini", "kebija
                             contents: formattedContents,
                             generationConfig: {
                                 temperature: 0.7,
-                                maxOutputTokens: 1000,
+                                maxOutputTokens: 8192,
+                                thinkingConfig: {
+                                    thinkingBudget: 0,
+                                },
                             },
                         }),
                     }
@@ -191,9 +195,14 @@ PENTING: Jika pertanyaan warga merujuk pada "berita ini", "artikel ini", "kebija
 
                 const data = await response.json();
 
-                if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-                    aiReply = data.candidates[0].content.parts[0].text;
-                    break;
+                if (response.ok && data?.candidates?.[0]?.content?.parts?.length) {
+                    const combinedText = data.candidates[0].content.parts
+                        .map((p: any) => p.text || "")
+                        .join("");
+                    if (combinedText.trim()) {
+                        aiReply = combinedText.trim();
+                        break;
+                    }
                 } else if (data.error) {
                     lastErrorMsg = data.error.message || "";
                     console.warn(`Model ${model} returned error:`, lastErrorMsg);

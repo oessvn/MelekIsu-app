@@ -24,7 +24,7 @@ interface Message {
     timestamp?: string;
 }
 
-// Komponen perender teks markdown sederhana (bold, list, link rujukan berita)
+// Komponen perender teks markdown sederhana (bold, list, header, link rujukan berita)
 function FormattedContent({ content }: { content: string }) {
     const lines = content.split("\n");
 
@@ -36,11 +36,24 @@ function FormattedContent({ content }: { content: string }) {
                     return <div key={idx} className="h-1.5" />;
                 }
 
-                const isBullet = trimmed.startsWith("•") || trimmed.startsWith("-") || trimmed.startsWith("* ");
-                const cleanLine = isBullet ? trimmed.replace(/^[•\-\*]\s*/, "") : trimmed;
+                // Deteksi header Markdown (#, ##, ###)
+                const isHeader = /^#{1,3}\s/.test(trimmed);
+                // Deteksi bullet list (•, -, *)
+                const isBullet = !isHeader && (trimmed.startsWith("•") || trimmed.startsWith("-") || trimmed.startsWith("* "));
+                // Deteksi numbered list (1., 2., dll)
+                const numMatch = !isHeader && !isBullet ? trimmed.match(/^(\d+)\.\s+(.*)$/) : null;
+
+                let textToParse = trimmed;
+                if (isHeader) {
+                    textToParse = trimmed.replace(/^#{1,3}\s*/, "");
+                } else if (isBullet) {
+                    textToParse = trimmed.replace(/^[•\-\*]\s*/, "");
+                } else if (numMatch) {
+                    textToParse = numMatch[2];
+                }
 
                 // Tokenizer untuk link [Label](url) dan bold **teks**
-                const tokens = cleanLine.split(/(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*)/g);
+                const tokens = textToParse.split(/(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*)/g);
 
                 const parsedInline = tokens.map((part, pIdx) => {
                     // Match Link [Judul](/berita/slug)
@@ -68,10 +81,27 @@ function FormattedContent({ content }: { content: string }) {
                     return <span key={pIdx}>{part}</span>;
                 });
 
+                if (isHeader) {
+                    return (
+                        <div key={idx} className="font-extrabold text-[#9B4000] text-[13px] pt-1">
+                            {parsedInline}
+                        </div>
+                    );
+                }
+
                 if (isBullet) {
                     return (
                         <div key={idx} className="flex items-start gap-2 pl-1">
                             <span className="text-[#9B4000] font-bold text-xs select-none">•</span>
+                            <div className="flex-1">{parsedInline}</div>
+                        </div>
+                    );
+                }
+
+                if (numMatch) {
+                    return (
+                        <div key={idx} className="flex items-start gap-1.5 pl-1">
+                            <span className="text-[#9B4000] font-bold text-xs select-none">{numMatch[1]}.</span>
                             <div className="flex-1">{parsedInline}</div>
                         </div>
                     );
