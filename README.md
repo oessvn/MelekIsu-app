@@ -1,4 +1,4 @@
-# WarTahu (Warta & Aksi Gagasan Terpadu)
+# MelekIsu
 
 > Platform digital interaktif untuk menyuarakan aspirasi masyarakat, menyajikan warta terkini, dan memantau transparansi aksi nyata dari berbagai gagasan publik.
 
@@ -20,8 +20,8 @@ Ikuti panduan berikut untuk menjalankan project di komputer lokal:
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/oessvn/WarTahu-app.git
-cd WarTahu-app
+git clone https://github.com/oessvn/MelekIsu-app.git
+cd MelekIsu-app
 ```
 
 ### 2. Install Dependencies
@@ -38,7 +38,15 @@ cp .env.example .env.local
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://henxsxlsmmtpxfvyssqx.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_QBw-hf8KNt3pV423CtPkAg_-RQeETe4
+GEMINI_API_KEY=masukkan_api_key_gemini_anda_di_sini
 ```
+
+> ⚠️ **Catatan untuk Dewan Juri / Penguji (Fitur AI Chatbot):**
+> Demi alasan keamanan dan pencegahan pencabutan kuota otomatis oleh Google (*secret scanning*), API Key tidak kami sertakan secara terbuka di repositori ini.
+> Untuk menguji respons cerdas real-time dari fitur **AI Chatbot**, silakan gunakan API Key Google Gemini pribadi Anda (gratis):
+> 1. Kunjungi [Google AI Studio](https://aistudio.google.com/) dan masuk menggunakan akun Google Anda.
+> 2. Klik menu **"Get API key"** $\rightarrow$ **"Create API key"** (gratis).
+> 3. Masukkan kunci tersebut pada variabel `GEMINI_API_KEY` di dalam file `.env.local`.
 
 ### 4. Jalankan Development Server
 ```bash

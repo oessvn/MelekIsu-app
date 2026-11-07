@@ -73,11 +73,11 @@ export default function UbahSandiPage() {
                     <div className="flex items-center gap-2.5">
                         <img
                             src="/images/logo.png"
-                            alt="Logo Nusantara Insight"
+                            alt="Logo MelekIsu"
                             className="w-10 h-10 object-contain rounded-xl shadow-xs"
                         />
                         <div>
-                            <span className="text-sm font-extrabold tracking-tight text-[#28180C]">WarTahu</span>
+                            <span className="text-sm font-extrabold tracking-tight text-[#28180C]">MelekIsu</span>
                             <p className="text-[10px] font-bold text-[#9B4000] tracking-wider uppercase">Integritas Demokrasi & Wacana Publik</p>
                         </div>
                     </div>

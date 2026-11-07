@@ -43,7 +43,7 @@ export default function Footer() {
             >
               <Newspaper className="h-5 w-5 text-primary-600" />
               <span className="font-editorial">
-                Nusantara<span className="text-primary-500">Insight</span>
+                Melek<span className="text-[#FDB659]">Isu</span>
               </span>
             </Link>
             <p className="text-sm leading-relaxed text-gray-500">
@@ -53,7 +53,7 @@ export default function Footer() {
             <div className="flex flex-col gap-2 text-sm text-gray-500">
               <span className="flex items-center gap-1.5">
                 <Mail className="h-3.5 w-3.5" />
-                info@wartagagasan.id
+                info@melekisu.id
               </span>
               <span className="flex items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5" />
