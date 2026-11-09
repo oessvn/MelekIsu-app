@@ -3,8 +3,8 @@
 import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { MessageSquare, ThumbsUp, ArrowRight, Send, AlertCircle, X, Search, FileText, HelpCircle, CheckCircle2 } from "lucide-react";
-import { getCombinedNews, sendComment, getCommentsForSlug } from "@/lib/newsService";
+import { MessageSquare, ThumbsUp, ArrowRight, Send, AlertCircle, X, Search, FileText, HelpCircle, CheckCircle2, Bot, Sparkles } from "lucide-react";
+import { getCombinedNews, sendComment, getCommentsForSlug, isTextViolating } from "@/lib/newsService";
 import { NewsItem } from "@/data/news";
 
 function BeritaContent() {
@@ -23,6 +23,12 @@ function BeritaContent() {
     const [pendingSubmit, setPendingSubmit] = useState<{ articleId: string; text: string; articleSlug: string } | null>(null);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [moderationFeedback, setModerationFeedback] = useState<{
+        approved: boolean;
+        status: string;
+        reason: string;
+        sentiment?: string;
+    } | null>(null);
 
     // Sinkronisasi data berita dinamis & user
     useEffect(() => {
@@ -126,31 +132,52 @@ function BeritaContent() {
 
         setIsSubmitting(true);
         const { articleId, articleSlug, text } = pendingSubmit;
+        const targetArticle = newsData.find((item) => item.id === articleId);
 
-        const newComment = await sendComment(
-            articleSlug,
-            currentUser.fullName,
-            currentUser.emailOrPhone || "",
-            text
-        );
+        try {
+            const newComment = await sendComment(
+                articleSlug,
+                currentUser.fullName,
+                currentUser.emailOrPhone || "",
+                text,
+                targetArticle?.title,
+                targetArticle?.excerpt,
+                targetArticle?.content
+            );
 
-        setNewsData((prev) =>
-            prev.map((item) => {
-                if (item.id === articleId) {
-                    const updatedList = [...(item.commentsList || []), newComment];
-                    return {
-                        ...item,
-                        commentsList: updatedList,
-                    };
-                }
-                return item;
-            })
-        );
+            const mod = (newComment as any).moderation;
+            const isApproved = newComment.status === "Terverifikasi";
 
-        setCommentInputs((prev) => ({ ...prev, [articleId]: "" }));
-        setPendingSubmit(null);
-        setIsSubmitting(false);
-        setShowSuccessModal(true);
+            setModerationFeedback(mod || {
+                approved: isApproved,
+                status: newComment.status || "Terverifikasi",
+                reason: newComment.aiReason || "Tanggapan telah diproses sistem."
+            });
+
+            if (isApproved || newComment.status === "Menunggu Verifikasi") {
+                setNewsData((prev) =>
+                    prev.map((item) => {
+                        if (item.id === articleId) {
+                            const updatedList = [...(item.commentsList || []), newComment];
+                            return {
+                                ...item,
+                                commentsList: updatedList,
+                            };
+                        }
+                        return item;
+                    })
+                );
+                setCommentInputs((prev) => ({ ...prev, [articleId]: "" }));
+            }
+
+            setPendingSubmit(null);
+            setShowSuccessModal(true);
+        } catch (err) {
+            console.error("Gagal mengirim tanggapan:", err);
+            alert("Terjadi kendala saat mengirim tanggapan. Silakan coba kembali.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -220,7 +247,9 @@ function BeritaContent() {
 
                             // Komentar "Menunggu Verifikasi" HANYA terlihat oleh pengirimnya sendiri
                             // Publik/user lain hanya melihat komentar "Terverifikasi"
+                            // Komentar Ditolak atau mengandung kata kasar TIDAK PERNAH tampil
                             const visibleComments = (article.commentsList || []).filter((c: any) => {
+                                if (c.status === "Ditolak" || isTextViolating(c.text || "").violated) return false;
                                 if (c.status === "Terverifikasi") return true;
                                 if (isAuthorOfComment(c)) return true;
                                 return false;
@@ -229,7 +258,10 @@ function BeritaContent() {
 
                             const userAlreadyCommented = currentUser
                                 ? (article.commentsList || []).some(
-                                    (c: any) => c.authorEmail === currentUser.emailOrPhone || c.author === currentUser.fullName
+                                    (c: any) => 
+                                        c.status === "Terverifikasi" &&
+                                        !isTextViolating(c.text || "").violated &&
+                                        (c.authorEmail === currentUser.emailOrPhone || c.author === currentUser.fullName)
                                 )
                                 : false;
 
@@ -395,17 +427,17 @@ function BeritaContent() {
                 )}
             </main>
 
-            {/* Modal Kustom Konfirmasi Pengiriman (Menggantikan popup browser) */}
+            {/* Modal Kustom Konfirmasi Pengiriman dengan AI Moderation */}
             {pendingSubmit && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
                     <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-[#DEC0B3]/40 flex flex-col items-center text-center gap-5">
                         <div className="w-16 h-16 rounded-full bg-[#FFF1E9] text-[#9B4000] flex items-center justify-center shadow-inner">
-                            <HelpCircle className="w-9 h-9 text-[#9B4000]" />
+                            <Bot className="w-9 h-9 text-[#9B4000]" />
                         </div>
                         <div className="space-y-2">
-                            <h3 className="text-xl font-extrabold text-[#28180C]">Konfirmasi Pengiriman Tanggapan</h3>
+                            <h3 className="text-xl font-extrabold text-[#28180C]">Verifikasi Otomatis AI</h3>
                             <p className="text-xs sm:text-sm text-[#574238] leading-relaxed">
-                                Setiap warga hanya dapat mengirimkan <strong className="text-[#9B4000]">1 tanggapan</strong> per artikel. Tanggapan Anda akan berstatus <span className="text-amber-800 font-bold">Menunggu Verifikasi</span>. Lanjutkan kirim?
+                                Tanggapan Anda akan <strong className="text-[#9B4000]">diverifikasi secara otomatis oleh AI MelekIsu</strong>. Jika memenuhi etika dan kesantunan diskursus publik, tanggapan Anda akan langsung terbit ke publik. Lanjutkan kirim?
                             </p>
                         </div>
                         <div className="flex items-center gap-3 w-full pt-2">
@@ -413,39 +445,94 @@ function BeritaContent() {
                                 onClick={() => setPendingSubmit(null)}
                                 className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
                             >
-                                Batalkan
+                                Periksa Lagi
                             </button>
                             <button
                                 onClick={handleConfirmCommentSend}
                                 disabled={isSubmitting}
-                                className="flex-1 py-3 px-4 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
+                                className="flex-1 py-3 px-4 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
                             >
-                                {isSubmitting ? "Mengirim..." : "Ya, Kirim Sekarang"}
+                                {isSubmitting ? (
+                                    <>
+                                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        <span>AI Memverifikasi...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                        <span>Kirim & Verifikasi AI</span>
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Modal Kustom Sukses Pengiriman */}
-            {showSuccessModal && (
+            {/* Modal Kustom Hasil Verifikasi AI */}
+            {showSuccessModal && moderationFeedback && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
                     <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-[#DEC0B3]/40 flex flex-col items-center text-center gap-5">
-                        <div className="w-16 h-16 rounded-full bg-[#FFF1E9] text-[#9B4000] flex items-center justify-center shadow-inner">
-                            <CheckCircle2 className="w-9 h-9 text-[#9B4000]" />
-                        </div>
-                        <div className="space-y-2">
-                            <h3 className="text-xl font-extrabold text-[#28180C]">Tanggapan Terkirim!</h3>
-                            <p className="text-xs sm:text-sm text-[#574238] leading-relaxed">
-                                Terima kasih atas partisipasi aktif Anda. Tanggapan Anda telah tercatat dan masuk ke antrean verifikasi redaksi di dashboard admin.
-                            </p>
-                        </div>
-                        <button
-                            onClick={() => setShowSuccessModal(false)}
-                            className="w-full mt-2 py-3 px-5 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
-                        >
-                            Tutup
-                        </button>
+                        {moderationFeedback.approved ? (
+                            <>
+                                <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner border border-emerald-100">
+                                    <CheckCircle2 className="w-9 h-9 text-emerald-600" />
+                                </div>
+                                <div className="space-y-2">
+                                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <Bot className="w-3.5 h-3.5" />
+                                        <span>Lolos Kurasi Otomatis AI</span>
+                                    </span>
+                                    <h3 className="text-xl font-extrabold text-[#28180C]">Tanggapan Terverifikasi & Terbit!</h3>
+                                    <p className="text-xs sm:text-sm text-[#574238] leading-relaxed">
+                                        Terima kasih atas partisipasi Anda. Tanggapan Anda dinilai memenuhi standar kesantunan publik oleh AI MelekIsu sehingga langsung dapat dibaca oleh seluruh warga.
+                                    </p>
+                                    {moderationFeedback.reason && (
+                                        <div className="mt-2 p-3 bg-[#FFF8F5] rounded-xl border border-[#DEC0B3]/40 text-left text-xs text-[#574238]">
+                                            <strong className="text-[#9B4000] block mb-0.5">Analisis Kurasi AI:</strong>
+                                            <span>{moderationFeedback.reason}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={() => setShowSuccessModal(false)}
+                                    className="w-full mt-2 py-3 px-5 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                                >
+                                    Selesai & Lihat Diskusi
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner border border-rose-100">
+                                    <AlertCircle className="w-9 h-9 text-rose-600" />
+                                </div>
+                                <div className="space-y-2">
+                                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                        <Bot className="w-3.5 h-3.5" />
+                                        <span>Kurasi AI: Belum Memenuhi Syarat</span>
+                                    </span>
+                                    <h3 className="text-xl font-extrabold text-[#28180C]">Tanggapan Ditolak Sistem</h3>
+                                    <p className="text-xs sm:text-sm text-[#574238] leading-relaxed">
+                                        Sistem kurasi otomatis mendeteksi bahwa masukan Anda belum memenuhi panduan komunitas MelekIsu.
+                                    </p>
+                                    {moderationFeedback.reason && (
+                                        <div className="mt-2 p-3 bg-rose-50/60 rounded-xl border border-rose-200 text-left text-xs text-rose-900">
+                                            <strong className="text-rose-700 block mb-0.5">Alasan Kurasi:</strong>
+                                            <span>{moderationFeedback.reason}</span>
+                                        </div>
+                                    )}
+                                    <p className="text-[11px] text-[#8B7266] italic mt-2">
+                                        *Kuota Anda belum terpotong. Silakan perbaiki kalimat Anda agar lebih konstruktif dan sopan.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setShowSuccessModal(false)}
+                                    className="w-full mt-2 py-3 px-5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                                >
+                                    Perbaiki Kalimat
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

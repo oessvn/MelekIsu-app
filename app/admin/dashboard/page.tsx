@@ -13,7 +13,10 @@ import {
     Upload,
     Link as LinkIcon,
     X,
-    FileText
+    FileText,
+    Bot,
+    Sparkles,
+    AlertCircle
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { newsDatabase, NewsItem, NewsComment } from "@/data/news";
@@ -379,11 +382,11 @@ export default function AdminDashboardPage() {
             <div id="moderasi-komentar" className="bg-white rounded-3xl p-6 sm:p-8 border border-[#DEC0B3]/50 shadow-xs space-y-6">
                 <div className="border-b border-[#DEC0B3]/30 pb-4">
                     <h2 className="text-lg font-extrabold text-[#28180C] flex items-center gap-2">
-                        <Clock className="w-5 h-5 text-amber-700" />
-                        <span>Antrean Moderasi Tanggapan Warga</span>
+                        <Bot className="w-5 h-5 text-[#9B4000]" />
+                        <span>Moderasi Masukan Warga (AI-Powered)</span>
                     </h2>
                     <p className="text-xs text-[#73594B] mt-0.5">
-                        Setujui tanggapan warga yang berkualitas dan bebas ujaran kebencian agar tampil di halaman baca artikel.
+                        Sistem kini dilengkapi kurasi otomatis Google Gemini. Tanggapan yang lolos etika langsung terbit ke publik, sementara admin memiliki kendali penuh untuk meninjau, menyetujui, atau menghapus tanggapan.
                     </p>
                 </div>
 
@@ -395,11 +398,17 @@ export default function AdminDashboardPage() {
                     <div className="space-y-3">
                         {allComments.map((item) => {
                             const isPending = item.status === "Menunggu Verifikasi";
+                            const isRejected = item.status === "Ditolak";
+                            const isVerified = item.status === "Terverifikasi";
                             return (
                                 <div 
                                     key={item.id} 
                                     className={`p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${
-                                        isPending ? "bg-amber-50/50 border-amber-200" : "bg-[#FFFDFB] border-[#DEC0B3]/40"
+                                        isRejected 
+                                            ? "bg-rose-50/40 border-rose-200"
+                                            : isPending 
+                                            ? "bg-amber-50/50 border-amber-200" 
+                                            : "bg-[#FFFDFB] border-[#DEC0B3]/40"
                                     }`}
                                 >
                                     <div className="space-y-1.5 flex-1">
@@ -408,13 +417,21 @@ export default function AdminDashboardPage() {
                                             {item.authorEmail && (
                                                 <span className="text-[10px] text-[#8B7266]">({item.authorEmail})</span>
                                             )}
-                                            {isPending ? (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                                                    <Clock className="w-3 h-3" /> Menunggu Verifikasi
+                                            {isRejected ? (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                                                    <AlertCircle className="w-3 h-3 text-rose-600" />
+                                                    <span>Ditolak Kurasi AI</span>
+                                                </span>
+                                            ) : isPending ? (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                                    <Clock className="w-3 h-3 text-amber-600" />
+                                                    <span>Menunggu Review Manual</span>
                                                 </span>
                                             ) : (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                                    <CheckCircle2 className="w-3 h-3" /> Terverifikasi
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                                    <Bot className="w-2.5 h-2.5 text-emerald-600" />
+                                                    <span>Terverifikasi</span>
                                                 </span>
                                             )}
                                         </div>
@@ -428,13 +445,14 @@ export default function AdminDashboardPage() {
 
                                     {/* Action Buttons */}
                                     <div className="flex items-center gap-2 self-end md:self-center shrink-0">
-                                        {isPending && (
+                                        {(isPending || isRejected) && (
                                             <button
                                                 onClick={() => handleVerifyComment(item.id, item.slug)}
                                                 className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer"
+                                                title="Setujui manual agar tampil di publik"
                                             >
                                                 <CheckCircle2 className="w-3.5 h-3.5" />
-                                                <span>Setujui</span>
+                                                <span>Setujui Manual</span>
                                             </button>
                                         )}
                                         <button

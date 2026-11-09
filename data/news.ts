@@ -1,9 +1,10 @@
-﻿export interface NewsComment {
+export interface NewsComment {
     id: string;
     author: string;
     authorEmail?: string;
     text: string;
-    status?: "Terverifikasi" | "Menunggu Verifikasi";
+    status?: "Terverifikasi" | "Menunggu Verifikasi" | "Ditolak";
+    aiReason?: string;
     createdAt?: string;
 }
 
