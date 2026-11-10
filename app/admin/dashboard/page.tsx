@@ -16,10 +16,15 @@ import {
     FileText,
     Bot,
     Sparkles,
-    AlertCircle
+    AlertCircle,
+    Zap,
+    Database,
+    Layers,
+    ExternalLink
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { newsDatabase, NewsItem, NewsComment } from "@/data/news";
+import { POLICY_DATASETS, getCategoryCoverImage } from "@/lib/policyDatasets";
 
 export default function AdminDashboardPage() {
     const supabase = createClient();
@@ -41,6 +46,15 @@ export default function AdminDashboardPage() {
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [imageUploadType, setImageUploadType] = useState<"url" | "file">("file");
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Fitur AI Auto-Publish Berita
+    const [showAutoNewsModal, setShowAutoNewsModal] = useState(false);
+    const [selectedDatasetId, setSelectedDatasetId] = useState("");
+    const [customTopicInput, setCustomTopicInput] = useState("");
+    const [isGeneratingAutoNews, setIsGeneratingAutoNews] = useState(false);
+    const [autoNewsStepText, setAutoNewsStepText] = useState("");
+    const [generatedDraft, setGeneratedDraft] = useState<any | null>(null);
+    const [isAIAssisting, setIsAIAssisting] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -282,6 +296,143 @@ export default function AdminDashboardPage() {
         alert("Berita baru berhasil diterbitkan!");
     };
 
+    // Handler AI: Publikasi Otomatis Instan (1-Klik)
+    const handleQuickAutoPublish = async () => {
+        setIsGeneratingAutoNews(true);
+        setAutoNewsStepText("Menghubungkan ke dataset kebijakan publik...");
+
+        try {
+            setAutoNewsStepText("AI Gemini menyusun berita kebijakan komprehensif...");
+            const res = await fetch("/api/auto-news", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    datasetId: selectedDatasetId || undefined,
+                    topic: customTopicInput.trim() || undefined,
+                    autoPublish: true,
+                }),
+            });
+
+            setAutoNewsStepText("Menerbitkan berita ke portal publik...");
+            const data = await res.json();
+
+            if (data.success && data.news) {
+                alert(`Berhasil! Berita kebijakan otomatis diterbitkan:\n"${data.news.title}"`);
+                setShowAutoNewsModal(false);
+                setGeneratedDraft(null);
+                setCustomTopicInput("");
+                loadData();
+            } else {
+                alert("Gagal memproduksi berita otomatis: " + (data.message || "Unknown error"));
+            }
+        } catch (err: any) {
+            alert("Kendala koneksi ke AI Auto-News: " + err.message);
+        } finally {
+            setIsGeneratingAutoNews(false);
+            setAutoNewsStepText("");
+        }
+    };
+
+    // Handler AI: Pratinjau Draf Terlebih Dahulu
+    const handleGenerateDraftPreview = async () => {
+        setIsGeneratingAutoNews(true);
+        setAutoNewsStepText("AI Gemini menganalisis topik dan menyusun draf...");
+
+        try {
+            const res = await fetch("/api/auto-news", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    datasetId: selectedDatasetId || undefined,
+                    topic: customTopicInput.trim() || undefined,
+                    autoPublish: false,
+                }),
+            });
+
+            const data = await res.json();
+            if (data.success && data.news) {
+                setGeneratedDraft(data.news);
+            } else {
+                alert("Gagal memproduksi draf: " + (data.message || "Unknown error"));
+            }
+        } catch (err: any) {
+            alert("Kendala koneksi: " + err.message);
+        } finally {
+            setIsGeneratingAutoNews(false);
+            setAutoNewsStepText("");
+        }
+    };
+
+    // Handler AI: Terbitkan Draf yang Sudah Ditinjau
+    const handlePublishDraft = async () => {
+        if (!generatedDraft) return;
+        setIsGeneratingAutoNews(true);
+        setAutoNewsStepText("Menerbitkan draf ke Supabase Live DB...");
+
+        try {
+            if (isDbConnected) {
+                const { error } = await supabase.from("news").insert([generatedDraft]);
+                if (error) throw error;
+            } else {
+                const existingCustom = localStorage.getItem("melekisu_custom_news");
+                const customList = existingCustom ? JSON.parse(existingCustom) : [];
+                localStorage.setItem("melekisu_custom_news", JSON.stringify([{ ...generatedDraft, id: `n-${Date.now()}` }, ...customList]));
+            }
+
+            alert(`Berita "${generatedDraft.title}" berhasil diterbitkan ke portal!`);
+            setShowAutoNewsModal(false);
+            setGeneratedDraft(null);
+            setCustomTopicInput("");
+            loadData();
+        } catch (err: any) {
+            alert("Gagal menerbitkan draf: " + err.message);
+        } finally {
+            setIsGeneratingAutoNews(false);
+            setAutoNewsStepText("");
+        }
+    };
+
+    // Handler AI: Bantu Tulis Cepat di Form Tambah Berita Manual
+    const handleAIAssistManualForm = async () => {
+        if (!newTitle.trim()) {
+            alert("Ketikkan topik atau judul ringkas terlebih dahulu di kolom Judul.");
+            return;
+        }
+
+        setIsAIAssisting(true);
+        try {
+            const res = await fetch("/api/auto-news", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    topic: newTitle.trim(),
+                    category: newCategory,
+                    source: newSource || undefined,
+                    autoPublish: false,
+                }),
+            });
+
+            const data = await res.json();
+            if (data.success && data.news) {
+                setNewTitle(data.news.title);
+                setNewCategory(data.news.category || newCategory);
+                setNewSource(data.news.source || newSource || "Redaksi MelekIsu");
+                setNewExcerpt(data.news.excerpt);
+                setNewContent(data.news.content);
+                if (data.news.image && !newImageUrl) {
+                    setNewImageUrl(data.news.image);
+                    setImagePreview(data.news.image);
+                }
+            } else {
+                alert("Gagal auto-generate konten: " + (data.message || "Unknown error"));
+            }
+        } catch (err: any) {
+            alert("Kendala koneksi ke AI: " + err.message);
+        } finally {
+            setIsAIAssisting(false);
+        }
+    };
+
     const pendingCommentsCount = allComments.filter((c) => c.status === "Menunggu Verifikasi").length;
     const verifiedCommentsCount = allComments.filter((c) => c.status === "Terverifikasi").length;
 
@@ -311,7 +462,7 @@ export default function AdminDashboardPage() {
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2.5 self-start sm:self-auto">
+                <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
                     <button
                         onClick={loadData}
                         disabled={isLoading}
@@ -322,11 +473,22 @@ export default function AdminDashboardPage() {
                     </button>
 
                     <button
+                        onClick={() => {
+                            setGeneratedDraft(null);
+                            setShowAutoNewsModal(true);
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#7C2D12] via-[#9B4000] to-[#D97706] text-white text-xs font-extrabold shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer border border-amber-400/30"
+                    >
+                        <Sparkles className="w-4 h-4 text-amber-200 animate-pulse" />
+                        <span>Auto-Publish Berita AI</span>
+                    </button>
+
+                    <button
                         onClick={() => setShowAddModal(true)}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#9B4000] to-[#B34B00] text-white text-xs font-extrabold shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-[#9B4000] border border-[#DEC0B3] hover:bg-[#FFF8F5] text-xs font-extrabold shadow-xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
                     >
                         <Plus className="w-4 h-4" />
-                        <span>Terbitkan Berita Baru</span>
+                        <span>Tulis Manual</span>
                     </button>
                 </div>
             </div>
@@ -555,9 +717,21 @@ export default function AdminDashboardPage() {
                         </div>
 
                         <form onSubmit={handleCreateNews} className="space-y-4 text-xs">
-                            {/* Judul */}
+                            {/* Judul & AI Assist Button */}
                             <div className="space-y-1.5">
-                                <label className="font-bold text-[#28180C]">Judul Berita <span className="text-red-500">*</span></label>
+                                <div className="flex items-center justify-between">
+                                    <label className="font-bold text-[#28180C]">Judul Berita <span className="text-red-500">*</span></label>
+                                    <button
+                                        type="button"
+                                        onClick={handleAIAssistManualForm}
+                                        disabled={isAIAssisting || !newTitle.trim()}
+                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-[10px] font-bold transition-colors cursor-pointer disabled:opacity-40"
+                                        title="Ketikkan topik ringkas di judul, lalu klik untuk auto-lengkapi seluruh formulir dengan AI"
+                                    >
+                                        <Sparkles className={`w-3 h-3 text-amber-600 ${isAIAssisting ? "animate-spin" : ""}`} />
+                                        <span>{isAIAssisting ? "AI Menyusun..." : "✨ Auto-Lengkapi dengan AI"}</span>
+                                    </button>
+                                </div>
                                 <input
                                     type="text"
                                     required
@@ -714,6 +888,209 @@ export default function AdminDashboardPage() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Auto-Publish Berita AI & Integrasi Dataset */}
+            {showAutoNewsModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-[#DEC0B3]/40 flex flex-col gap-6 max-h-[92vh] overflow-y-auto">
+                        {/* Header Modal */}
+                        <div className="flex items-start justify-between border-b border-[#DEC0B3]/30 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#7C2D12] to-[#B34B00] text-white flex items-center justify-center shadow-md shadow-[#9B4000]/20 shrink-0">
+                                    <Sparkles className="w-6 h-6 text-amber-300" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-lg sm:text-xl font-extrabold text-[#28180C]">
+                                            Publikasi Berita Otomatis AI
+                                        </h3>
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300">
+                                            Gemini Flash AI
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-[#73594B] mt-0.5">
+                                        AI memproduksi narasi jurnalisme warga berkualitas tinggi dari dataset kebijakan publik dan langsung menerbitkannya ke portal live.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    if (!isGeneratingAutoNews) {
+                                        setShowAutoNewsModal(false);
+                                        setGeneratedDraft(null);
+                                    }
+                                }}
+                                disabled={isGeneratingAutoNews}
+                                className="text-gray-400 hover:text-gray-600 font-bold p-1 cursor-pointer disabled:opacity-30"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Status Loading Animasi saat Berita sedang Diproduksi */}
+                        {isGeneratingAutoNews && (
+                            <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-300/80 animate-pulse flex items-center gap-4">
+                                <div className="w-8 h-8 rounded-full border-3 border-[#9B4000] border-t-transparent animate-spin shrink-0"></div>
+                                <div className="space-y-0.5">
+                                    <h4 className="text-xs font-extrabold text-[#9B4000] uppercase tracking-wider">
+                                        Memproses Berita Otomatis
+                                    </h4>
+                                    <p className="text-xs text-[#574238] font-medium">
+                                        {autoNewsStepText || "AI sedang menyusun artikel..."}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Opsi Pemilihan Dataset & Topik */}
+                        <div className="space-y-4 text-xs">
+                            {/* Pilihan Dataset Kebijakan */}
+                            <div className="space-y-1.5">
+                                <label className="font-bold text-[#28180C] flex items-center gap-1.5">
+                                    <Database className="w-3.5 h-3.5 text-[#9B4000]" />
+                                    <span>Pilih Rujukan Dataset Kebijakan Nasional</span>
+                                </label>
+                                <select
+                                    disabled={isGeneratingAutoNews}
+                                    value={selectedDatasetId}
+                                    onChange={(e) => {
+                                        setSelectedDatasetId(e.target.value);
+                                        setGeneratedDraft(null);
+                                    }}
+                                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#DEC0B3]/80 focus:border-[#9B4000] focus:outline-none bg-white font-medium"
+                                >
+                                    <option value="">🎲 Otomatis (Pilih Acak dari Kumpulan Dataset Terkini)</option>
+                                    {POLICY_DATASETS.map((ds) => (
+                                        <option key={ds.id} value={ds.id}>
+                                            [{ds.category}] {ds.title} ({ds.source})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Preview Detail Dataset Terpilih */}
+                            {selectedDatasetId && (
+                                (() => {
+                                    const ds = POLICY_DATASETS.find((d) => d.id === selectedDatasetId);
+                                    if (!ds) return null;
+                                    return (
+                                        <div className="p-3.5 rounded-xl bg-[#FFF8F5] border border-[#DEC0B3]/60 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[11px] font-bold text-[#9B4000]">{ds.source}</span>
+                                                <span className="text-[10px] text-[#8B7266] italic">{ds.datasetOrigin}</span>
+                                            </div>
+                                            <ul className="text-[11px] text-[#574238] space-y-1 list-disc list-inside">
+                                                {ds.keyPoints.map((pt, idx) => (
+                                                    <li key={idx}>{pt}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    );
+                                })()
+                            )}
+
+                            {/* Input Topik Kustom */}
+                            <div className="space-y-1.5">
+                                <label className="font-bold text-[#28180C] flex items-center justify-between">
+                                    <span>Atau Tentukan Topik Kebijakan Sendiri (Opsional)</span>
+                                    <span className="text-[10px] text-[#8B7266] font-normal">Bisa berupa isu terkini atau arahan spesifik</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    disabled={isGeneratingAutoNews}
+                                    value={customTopicInput}
+                                    onChange={(e) => {
+                                        setCustomTopicInput(e.target.value);
+                                        setGeneratedDraft(null);
+                                    }}
+                                    placeholder="Contoh: Percepatan Subsidi Pupuk Organik untuk Kelompok Tani Musim Tanam 2026"
+                                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#DEC0B3]/80 focus:border-[#9B4000] focus:outline-none bg-white"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Pratinjau Draf jika Admin memilih tombol Pratinjau */}
+                        {generatedDraft && !isGeneratingAutoNews && (
+                            <div className="p-5 rounded-2xl bg-[#FFFBF8] border-2 border-[#9B4000]/30 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#9B4000]/10 text-[#9B4000]">
+                                        {generatedDraft.category} • {generatedDraft.source}
+                                    </span>
+                                    <span className="text-[11px] text-[#8B7266] font-medium">{generatedDraft.duration}</span>
+                                </div>
+                                <h4 className="text-sm font-extrabold text-[#28180C] leading-snug">
+                                    {generatedDraft.title}
+                                </h4>
+                                <p className="text-xs text-[#574238] italic bg-white/70 p-2.5 rounded-xl border border-[#DEC0B3]/40">
+                                    "{generatedDraft.excerpt}"
+                                </p>
+                                <div className="text-xs text-[#574238] max-h-40 overflow-y-auto whitespace-pre-line leading-relaxed pr-2">
+                                    {generatedDraft.content}
+                                </div>
+                                <div className="pt-2 flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={handlePublishDraft}
+                                        disabled={isGeneratingAutoNews}
+                                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#9B4000] hover:bg-[#803500] text-white text-xs font-bold shadow-md cursor-pointer transition-all hover:scale-105"
+                                    >
+                                        <Zap className="w-4 h-4 text-amber-300" />
+                                        <span>Terbitkan Draf Ini Sekarang</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Tombol Aksi */}
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-[#DEC0B3]/30">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowAutoNewsModal(false);
+                                    setGeneratedDraft(null);
+                                }}
+                                disabled={isGeneratingAutoNews}
+                                className="px-4 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200 cursor-pointer text-center"
+                            >
+                                Tutup
+                            </button>
+
+                            <div className="flex items-center gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={handleGenerateDraftPreview}
+                                    disabled={isGeneratingAutoNews}
+                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-white border border-[#DEC0B3] text-[#574238] text-xs font-bold hover:bg-[#FFF8F5] cursor-pointer disabled:opacity-40 transition-colors"
+                                >
+                                    <FileText className="w-4 h-4 text-[#9B4000]" />
+                                    <span>Pratinjau Draf Dulu</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={handleQuickAutoPublish}
+                                    disabled={isGeneratingAutoNews}
+                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#7C2D12] via-[#9B4000] to-[#D97706] text-white text-xs font-extrabold shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer disabled:opacity-40"
+                                >
+                                    <Zap className="w-4 h-4 text-amber-200" />
+                                    <span>⚡ Terbitkan Otomatis Instan</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Informasi Webhook CRON & Otomasi API */}
+                        <div className="p-3.5 rounded-xl bg-[#FFF8F5] border border-[#DEC0B3]/60 text-[11px] text-[#73594B] space-y-1">
+                            <div className="flex items-center gap-1.5 font-bold text-[#28180C]">
+                                <Layers className="w-3.5 h-3.5 text-[#9B4000]" />
+                                <span>Otomasi Tanpa Sentuhan (Webhook & CRON Job)</span>
+                            </div>
+                            <p className="text-[10px] leading-relaxed">
+                                Endpoint API <code className="px-1.5 py-0.5 rounded bg-white border border-[#DEC0B3] font-mono text-[#9B4000]">POST /api/auto-news</code> atau <code className="px-1.5 py-0.5 rounded bg-white border border-[#DEC0B3] font-mono text-[#9B4000]">GET /api/auto-news</code> dapat dihubungkan ke CRON harian (misal: Vercel Cron atau GitHub Actions) untuk memproduksi dan mengunggah berita otomatis setiap pagi secara berkala.
+                            </p>
+                        </div>
                     </div>
                 </div>
             )}
