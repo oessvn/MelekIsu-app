@@ -20,11 +20,13 @@ import {
     Zap,
     Database,
     Layers,
-    ExternalLink
+    ExternalLink,
+    Globe
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { newsDatabase, NewsItem, NewsComment } from "@/data/news";
 import { POLICY_DATASETS, getCategoryCoverImage } from "@/lib/policyDatasets";
+import { EXTERNAL_NEWS_SOURCES, LiveExternalNewsItem } from "@/lib/externalNewsApi";
 
 export default function AdminDashboardPage() {
     const supabase = createClient();
@@ -55,6 +57,37 @@ export default function AdminDashboardPage() {
     const [autoNewsStepText, setAutoNewsStepText] = useState("");
     const [generatedDraft, setGeneratedDraft] = useState<any | null>(null);
     const [isAIAssisting, setIsAIAssisting] = useState(false);
+
+    // Fitur Live News API (Antara, CNN, CNBC)
+    const [autoNewsSourceMode, setAutoNewsSourceMode] = useState<"live_api" | "dataset" | "custom">("live_api");
+    const [selectedLiveSourceId, setSelectedLiveSourceId] = useState("antara-politik");
+    const [liveFeedItems, setLiveFeedItems] = useState<LiveExternalNewsItem[]>([]);
+    const [isLoadingLiveFeed, setIsLoadingLiveFeed] = useState(false);
+    const [selectedLiveArticle, setSelectedLiveArticle] = useState<LiveExternalNewsItem | null>(null);
+
+    const loadLiveFeed = async (sourceId: string) => {
+        setIsLoadingLiveFeed(true);
+        try {
+            const res = await fetch(`/api/auto-news?action=feed&sourceId=${sourceId}`);
+            const data = await res.json();
+            if (data.success && Array.isArray(data.items)) {
+                setLiveFeedItems(data.items);
+                if (data.items.length > 0) {
+                    setSelectedLiveArticle(data.items[0]);
+                }
+            }
+        } catch (e) {
+            console.error("Gagal load live news feed:", e);
+        } finally {
+            setIsLoadingLiveFeed(false);
+        }
+    };
+
+    useEffect(() => {
+        if (showAutoNewsModal && autoNewsSourceMode === "live_api") {
+            loadLiveFeed(selectedLiveSourceId);
+        }
+    }, [showAutoNewsModal, selectedLiveSourceId, autoNewsSourceMode]);
 
     useEffect(() => {
         loadData();
@@ -297,27 +330,35 @@ export default function AdminDashboardPage() {
     };
 
     // Handler AI: Publikasi Otomatis Instan (1-Klik)
-    const handleQuickAutoPublish = async () => {
+    const handleQuickAutoPublish = async (specificLiveArticle?: LiveExternalNewsItem) => {
         setIsGeneratingAutoNews(true);
-        setAutoNewsStepText("Menghubungkan ke dataset kebijakan publik...");
+        const targetLive = specificLiveArticle || selectedLiveArticle;
+        
+        if (autoNewsSourceMode === "live_api") {
+            setAutoNewsStepText(`Mengambil rilis dari ${targetLive?.sourceName || "API Media Luar"}...`);
+        } else {
+            setAutoNewsStepText("Menghubungkan ke dataset kebijakan publik...");
+        }
 
         try {
-            setAutoNewsStepText("AI Gemini menyusun berita kebijakan komprehensif...");
+            setAutoNewsStepText("AI Gemini menganalisis fakta & menyusun artikel kebijakan...");
             const res = await fetch("/api/auto-news", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    datasetId: selectedDatasetId || undefined,
-                    topic: customTopicInput.trim() || undefined,
+                    liveSourceId: autoNewsSourceMode === "live_api" ? selectedLiveSourceId : undefined,
+                    liveArticle: autoNewsSourceMode === "live_api" ? targetLive : undefined,
+                    datasetId: autoNewsSourceMode === "dataset" ? selectedDatasetId : undefined,
+                    topic: autoNewsSourceMode === "custom" ? customTopicInput.trim() : undefined,
                     autoPublish: true,
                 }),
             });
 
-            setAutoNewsStepText("Menerbitkan berita ke portal publik...");
+            setAutoNewsStepText("Menerbitkan berita ke Supabase Live DB...");
             const data = await res.json();
 
             if (data.success && data.news) {
-                alert(`Berhasil! Berita kebijakan otomatis diterbitkan:\n"${data.news.title}"`);
+                alert(`Berhasil! Berita dari ${data.sourceName || "API"} otomatis diterbitkan:\n"${data.news.title}"`);
                 setShowAutoNewsModal(false);
                 setGeneratedDraft(null);
                 setCustomTopicInput("");
@@ -336,6 +377,7 @@ export default function AdminDashboardPage() {
     // Handler AI: Pratinjau Draf Terlebih Dahulu
     const handleGenerateDraftPreview = async () => {
         setIsGeneratingAutoNews(true);
+        const targetLive = selectedLiveArticle;
         setAutoNewsStepText("AI Gemini menganalisis topik dan menyusun draf...");
 
         try {
@@ -343,8 +385,10 @@ export default function AdminDashboardPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    datasetId: selectedDatasetId || undefined,
-                    topic: customTopicInput.trim() || undefined,
+                    liveSourceId: autoNewsSourceMode === "live_api" ? selectedLiveSourceId : undefined,
+                    liveArticle: autoNewsSourceMode === "live_api" ? targetLive : undefined,
+                    datasetId: autoNewsSourceMode === "dataset" ? selectedDatasetId : undefined,
+                    topic: autoNewsSourceMode === "custom" ? customTopicInput.trim() : undefined,
                     autoPublish: false,
                 }),
             });
@@ -945,71 +989,243 @@ export default function AdminDashboardPage() {
                             </div>
                         )}
 
-                        {/* Opsi Pemilihan Dataset & Topik */}
+                        {/* Pemilihan Mode Sumber Berita (3 Tab) */}
                         <div className="space-y-4 text-xs">
-                            {/* Pilihan Dataset Kebijakan */}
-                            <div className="space-y-1.5">
-                                <label className="font-bold text-[#28180C] flex items-center gap-1.5">
-                                    <Database className="w-3.5 h-3.5 text-[#9B4000]" />
-                                    <span>Pilih Rujukan Dataset Kebijakan Nasional</span>
-                                </label>
-                                <select
-                                    disabled={isGeneratingAutoNews}
-                                    value={selectedDatasetId}
-                                    onChange={(e) => {
-                                        setSelectedDatasetId(e.target.value);
+                            <div className="flex items-center gap-1.5 p-1 bg-[#FFF1E9]/70 rounded-2xl border border-[#DEC0B3]/50">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setAutoNewsSourceMode("live_api");
                                         setGeneratedDraft(null);
                                     }}
-                                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#DEC0B3]/80 focus:border-[#9B4000] focus:outline-none bg-white font-medium"
+                                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl font-bold transition-all cursor-pointer ${
+                                        autoNewsSourceMode === "live_api"
+                                            ? "bg-[#9B4000] text-white shadow-sm"
+                                            : "text-[#73594B] hover:text-[#28180C]"
+                                    }`}
                                 >
-                                    <option value="">🎲 Otomatis (Pilih Acak dari Kumpulan Dataset Terkini)</option>
-                                    {POLICY_DATASETS.map((ds) => (
-                                        <option key={ds.id} value={ds.id}>
-                                            [{ds.category}] {ds.title} ({ds.source})
-                                        </option>
-                                    ))}
-                                </select>
+                                    <Globe className="w-3.5 h-3.5" />
+                                    <span>Live News API (Antara/CNN)</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setAutoNewsSourceMode("dataset");
+                                        setGeneratedDraft(null);
+                                    }}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl font-bold transition-all cursor-pointer ${
+                                        autoNewsSourceMode === "dataset"
+                                            ? "bg-[#9B4000] text-white shadow-sm"
+                                            : "text-[#73594B] hover:text-[#28180C]"
+                                    }`}
+                                >
+                                    <Database className="w-3.5 h-3.5" />
+                                    <span>Dataset Kebijakan</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setAutoNewsSourceMode("custom");
+                                        setGeneratedDraft(null);
+                                    }}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl font-bold transition-all cursor-pointer ${
+                                        autoNewsSourceMode === "custom"
+                                            ? "bg-[#9B4000] text-white shadow-sm"
+                                            : "text-[#73594B] hover:text-[#28180C]"
+                                    }`}
+                                >
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    <span>Topik Kustom</span>
+                                </button>
                             </div>
 
-                            {/* Preview Detail Dataset Terpilih */}
-                            {selectedDatasetId && (
-                                (() => {
-                                    const ds = POLICY_DATASETS.find((d) => d.id === selectedDatasetId);
-                                    if (!ds) return null;
-                                    return (
-                                        <div className="p-3.5 rounded-xl bg-[#FFF8F5] border border-[#DEC0B3]/60 space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[11px] font-bold text-[#9B4000]">{ds.source}</span>
-                                                <span className="text-[10px] text-[#8B7266] italic">{ds.datasetOrigin}</span>
-                                            </div>
-                                            <ul className="text-[11px] text-[#574238] space-y-1 list-disc list-inside">
-                                                {ds.keyPoints.map((pt, idx) => (
-                                                    <li key={idx}>{pt}</li>
+                            {/* KONTEN TAB 1: Live News API Media Nasional */}
+                            {autoNewsSourceMode === "live_api" && (
+                                <div className="space-y-3 animate-in fade-in duration-150">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                        <label className="font-bold text-[#28180C] flex items-center gap-1.5">
+                                            <Globe className="w-3.5 h-3.5 text-[#9B4000]" />
+                                            <span>Pilih Saluran Media Berita Nasional</span>
+                                        </label>
+                                        <div className="flex items-center gap-2">
+                                            <select
+                                                disabled={isGeneratingAutoNews || isLoadingLiveFeed}
+                                                value={selectedLiveSourceId}
+                                                onChange={(e) => {
+                                                    setSelectedLiveSourceId(e.target.value);
+                                                    setGeneratedDraft(null);
+                                                }}
+                                                className="px-3 py-1.5 rounded-xl border border-[#DEC0B3]/80 focus:border-[#9B4000] focus:outline-none bg-white font-bold text-xs"
+                                            >
+                                                {EXTERNAL_NEWS_SOURCES.map((s) => (
+                                                    <option key={s.id} value={s.id}>
+                                                        {s.name}
+                                                    </option>
                                                 ))}
-                                            </ul>
+                                            </select>
+                                            <button
+                                                type="button"
+                                                onClick={() => loadLiveFeed(selectedLiveSourceId)}
+                                                disabled={isLoadingLiveFeed}
+                                                className="p-1.5 rounded-xl border border-[#DEC0B3] hover:bg-[#FFF8F5] text-[#574238] cursor-pointer"
+                                                title="Ambil Berita Terbaru dari Media"
+                                            >
+                                                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingLiveFeed ? "animate-spin text-[#9B4000]" : ""}`} />
+                                            </button>
                                         </div>
-                                    );
-                                })()
+                                    </div>
+
+                                    {/* List Berita Live yang Diambil Langsung dari API / RSS Media */}
+                                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                                        {isLoadingLiveFeed ? (
+                                            <div className="py-8 text-center text-xs text-[#8B7266] flex flex-col items-center gap-2">
+                                                <div className="w-6 h-6 border-2 border-[#9B4000] border-t-transparent rounded-full animate-spin"></div>
+                                                <span>Mengambil headline berita terbaru dari website media...</span>
+                                            </div>
+                                        ) : liveFeedItems.length === 0 ? (
+                                            <div className="py-6 text-center text-xs text-[#8B7266]">
+                                                Tidak ada berita terkini dari saluran ini. Coba saluran lain atau segarkan kembali.
+                                            </div>
+                                        ) : (
+                                            liveFeedItems.map((item, idx) => {
+                                                const isSelected = selectedLiveArticle?.link === item.link;
+                                                return (
+                                                    <div
+                                                        key={idx}
+                                                        onClick={() => {
+                                                            setSelectedLiveArticle(item);
+                                                            setGeneratedDraft(null);
+                                                        }}
+                                                        className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                                                            isSelected
+                                                                ? "bg-[#FFF8F5] border-[#9B4000] ring-2 ring-[#9B4000]/20"
+                                                                : "bg-white border-[#DEC0B3]/60 hover:border-[#DEC0B3]"
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                            {item.imageUrl ? (
+                                                                <img
+                                                                    src={item.imageUrl}
+                                                                    alt=""
+                                                                    className="w-14 h-14 rounded-xl object-cover shrink-0 border border-[#DEC0B3]/40"
+                                                                    onError={(e) => {
+                                                                        (e.target as HTMLElement).style.display = "none";
+                                                                    }}
+                                                                />
+                                                            ) : (
+                                                                <div className="w-14 h-14 rounded-xl bg-[#FFF1E9] text-[#9B4000] flex items-center justify-center shrink-0">
+                                                                    <Globe className="w-5 h-5" />
+                                                                </div>
+                                                            )}
+                                                            <div className="space-y-1 min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[10px] font-bold text-[#9B4000]">
+                                                                        {item.sourceName}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-[#8B7266]">
+                                                                        • {item.pubDate}
+                                                                    </span>
+                                                                </div>
+                                                                <h5 className="text-xs font-bold text-[#28180C] line-clamp-1 leading-snug">
+                                                                    {item.title}
+                                                                </h5>
+                                                                <p className="text-[11px] text-[#574238] line-clamp-1">
+                                                                    {item.description || "Klik untuk menyusun analisis kebijakan..."}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleQuickAutoPublish(item);
+                                                            }}
+                                                            disabled={isGeneratingAutoNews}
+                                                            className="shrink-0 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#9B4000] to-[#B34B00] text-white font-extrabold text-[10px] shadow-sm hover:scale-105 active:scale-95 transition-all cursor-pointer disabled:opacity-40"
+                                                            title="AI langsung menganalisis dan menerbitkan berita ini ke portal"
+                                                        >
+                                                            ⚡ Terbitkan Ini
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </div>
                             )}
 
-                            {/* Input Topik Kustom */}
-                            <div className="space-y-1.5">
-                                <label className="font-bold text-[#28180C] flex items-center justify-between">
-                                    <span>Atau Tentukan Topik Kebijakan Sendiri (Opsional)</span>
-                                    <span className="text-[10px] text-[#8B7266] font-normal">Bisa berupa isu terkini atau arahan spesifik</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    disabled={isGeneratingAutoNews}
-                                    value={customTopicInput}
-                                    onChange={(e) => {
-                                        setCustomTopicInput(e.target.value);
-                                        setGeneratedDraft(null);
-                                    }}
-                                    placeholder="Contoh: Percepatan Subsidi Pupuk Organik untuk Kelompok Tani Musim Tanam 2026"
-                                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#DEC0B3]/80 focus:border-[#9B4000] focus:outline-none bg-white"
-                                />
-                            </div>
+                            {/* KONTEN TAB 2: Dataset Kebijakan */}
+                            {autoNewsSourceMode === "dataset" && (
+                                <div className="space-y-3 animate-in fade-in duration-150">
+                                    <div className="space-y-1.5">
+                                        <label className="font-bold text-[#28180C] flex items-center gap-1.5">
+                                            <Database className="w-3.5 h-3.5 text-[#9B4000]" />
+                                            <span>Pilih Rujukan Dataset Kebijakan Nasional</span>
+                                        </label>
+                                        <select
+                                            disabled={isGeneratingAutoNews}
+                                            value={selectedDatasetId}
+                                            onChange={(e) => {
+                                                setSelectedDatasetId(e.target.value);
+                                                setGeneratedDraft(null);
+                                            }}
+                                            className="w-full px-3.5 py-2.5 rounded-xl border border-[#DEC0B3]/80 focus:border-[#9B4000] focus:outline-none bg-white font-medium"
+                                        >
+                                            <option value="">🎲 Otomatis (Pilih Acak dari Kumpulan Dataset Terkini)</option>
+                                            {POLICY_DATASETS.map((ds) => (
+                                                <option key={ds.id} value={ds.id}>
+                                                    [{ds.category}] {ds.title} ({ds.source})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Preview Detail Dataset Terpilih */}
+                                    {selectedDatasetId && (
+                                        (() => {
+                                            const ds = POLICY_DATASETS.find((d) => d.id === selectedDatasetId);
+                                            if (!ds) return null;
+                                            return (
+                                                <div className="p-3.5 rounded-xl bg-[#FFF8F5] border border-[#DEC0B3]/60 space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[11px] font-bold text-[#9B4000]">{ds.source}</span>
+                                                        <span className="text-[10px] text-[#8B7266] italic">{ds.datasetOrigin}</span>
+                                                    </div>
+                                                    <ul className="text-[11px] text-[#574238] space-y-1 list-disc list-inside">
+                                                        {ds.keyPoints.map((pt, idx) => (
+                                                            <li key={idx}>{pt}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            );
+                                        })()
+                                    )}
+                                </div>
+                            )}
+
+                            {/* KONTEN TAB 3: Input Topik Kustom */}
+                            {autoNewsSourceMode === "custom" && (
+                                <div className="space-y-3 animate-in fade-in duration-150">
+                                    <div className="space-y-1.5">
+                                        <label className="font-bold text-[#28180C] flex items-center justify-between">
+                                            <span>Tentukan Topik Kebijakan Sendiri</span>
+                                            <span className="text-[10px] text-[#8B7266] font-normal">Bisa berupa isu terkini atau arahan spesifik</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            disabled={isGeneratingAutoNews}
+                                            value={customTopicInput}
+                                            onChange={(e) => {
+                                                setCustomTopicInput(e.target.value);
+                                                setGeneratedDraft(null);
+                                            }}
+                                            placeholder="Contoh: Percepatan Subsidi Pupuk Organik untuk Kelompok Tani Musim Tanam 2026"
+                                            className="w-full px-3.5 py-2.5 rounded-xl border border-[#DEC0B3]/80 focus:border-[#9B4000] focus:outline-none bg-white"
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Pratinjau Draf jika Admin memilih tombol Pratinjau */}
@@ -1071,7 +1287,7 @@ export default function AdminDashboardPage() {
 
                                 <button
                                     type="button"
-                                    onClick={handleQuickAutoPublish}
+                                    onClick={() => handleQuickAutoPublish()}
                                     disabled={isGeneratingAutoNews}
                                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#7C2D12] via-[#9B4000] to-[#D97706] text-white text-xs font-extrabold shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer disabled:opacity-40"
                                 >

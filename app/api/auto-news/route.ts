@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { POLICY_DATASETS, getCategoryCoverImage, PolicyTopicDataset } from "@/lib/policyDatasets";
+import { 
+    EXTERNAL_NEWS_SOURCES, 
+    fetchExternalLiveNews, 
+    LiveExternalNewsItem 
+} from "@/lib/externalNewsApi";
 
 function getSupabaseClient() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -33,26 +38,50 @@ export async function POST(req: Request) {
             category: customCategory,
             source: customSource,
             datasetId,
+            liveSourceId,
+            liveArticle,
             autoPublish = true,
         } = body;
 
-        // 1. Tentukan dataset acuan atau topik yang diminta
         let selectedDataset: PolicyTopicDataset | null = null;
-        if (datasetId) {
-            selectedDataset = POLICY_DATASETS.find((d) => d.id === datasetId) || null;
+        let selectedLiveItem: LiveExternalNewsItem | null = liveArticle || null;
+        let liveSourceName = "";
+
+        // 1. Jika pengguna meminta dari API Website Berita Luar (Live News Feed)
+        if (liveSourceId && !selectedLiveItem) {
+            const liveItems = await fetchExternalLiveNews(liveSourceId, 5);
+            if (liveItems.length > 0) {
+                selectedLiveItem = liveItems[0];
+                liveSourceName = selectedLiveItem.sourceName;
+            }
+        } else if (selectedLiveItem) {
+            liveSourceName = selectedLiveItem.sourceName;
         }
 
-        if (!selectedDataset && !topic) {
-            // Ambil acak dari kumpulan dataset kebijakan
-            const randomIndex = Math.floor(Math.random() * POLICY_DATASETS.length);
-            selectedDataset = POLICY_DATASETS[randomIndex];
+        // 2. Jika bukan dari Live Feed, gunakan Dataset Kebijakan atau Topik Kustom
+        if (!selectedLiveItem) {
+            if (datasetId) {
+                selectedDataset = POLICY_DATASETS.find((d) => d.id === datasetId) || null;
+            }
+
+            if (!selectedDataset && !topic) {
+                // Ambil acak dari kumpulan dataset kebijakan
+                const randomIndex = Math.floor(Math.random() * POLICY_DATASETS.length);
+                selectedDataset = POLICY_DATASETS[randomIndex];
+            }
         }
 
-        const topicTitle = topic || selectedDataset?.title || "Evaluasi Transparansi Kebijakan Publik Nasional";
-        const topicCategory = customCategory || selectedDataset?.category || "Tata Kelola & Transparansi";
-        const topicSource = customSource || selectedDataset?.source || "Redaksi Riset Kebijakan MelekIsu";
-        const datasetOrigin = selectedDataset?.datasetOrigin || "Portal Data Kebijakan Terbuka";
-        const keyPointsText = selectedDataset?.keyPoints?.map((p) => `- ${p}`).join("\n") || "- Fokus pada keterbukaan, efisiensi anggaran, dan dampak langsung bagi masyarakat.";
+        // Tentukan metadata artikel
+        const topicTitle = selectedLiveItem?.title || topic || selectedDataset?.title || "Evaluasi Transparansi Kebijakan Publik Nasional";
+        const topicCategory = customCategory || selectedDataset?.category || (selectedLiveItem ? "Tata Kelola & Transparansi" : "Kebijakan Publik");
+        const topicSource = selectedLiveItem ? selectedLiveItem.sourceName : (customSource || selectedDataset?.source || "Redaksi Riset MelekIsu");
+        const datasetOrigin = selectedLiveItem ? `Live API Feed (${selectedLiveItem.sourceName})` : (selectedDataset?.datasetOrigin || "Portal Data Terbuka");
+        
+        const keyPointsText = selectedLiveItem
+            ? `- Berita Terkini dari ${selectedLiveItem.sourceName}: ${selectedLiveItem.description}\n- Tautan Asli: ${selectedLiveItem.link}`
+            : (selectedDataset?.keyPoints?.map((p) => `- ${p}`).join("\n") || "- Fokus pada transparansi, efisiensi anggaran, dan dampak langsung bagi masyarakat.");
+
+        const initialCoverImage = selectedLiveItem?.imageUrl || selectedDataset?.defaultImage || getCategoryCoverImage(topicCategory);
 
         const apiKey = process.env.GEMINI_API_KEY || "";
         const hasApiKey = Boolean(apiKey && apiKey.length > 20 && apiKey !== "masukkan_api_key_gemini_anda_di_sini");
@@ -78,19 +107,19 @@ export async function POST(req: Request) {
 
         if (hasApiKey) {
             const systemPrompt = `Anda adalah Jurnalis Kebijakan Publik & Asisten Redaksi Senior untuk platform jurnalisme warga "MelekIsu".
-Tugas Anda adalah memproduksi artikel berita analisis kebijakan publik yang mendalam, berimbang, berbasis data, dan mudah dipahami oleh masyarakat umum.
+Tugas Anda adalah memproduksi atau mentransformasikan rilis berita/dataset kebijakan menjadi artikel analisis kebijakan publik yang mendalam, berimbang, berbasis data, dan mudah dipahami oleh masyarakat umum.
 
 Kaidah Penulisan MelekIsu:
-1. JUDUL: Tajam, informatif, menarik, dan objektif (gaya jurnalisme kebijakan terpercaya, hindari clickbait murahan).
+1. JUDUL: Tajam, informatif, menarik, dan berbobot (gaya jurnalisme kebijakan terpercaya, tidak sensasional atau clickbait).
 2. RINGKASAN (EXCERPT): 1-2 kalimat padat yang merangkum esensi utama kebijakan dan dampaknya bagi masyarakat.
 3. ISI ARTIKEL (CONTENT):
    - Terdiri dari 3 sampai 4 paragraf komprehensif.
-   - Paragraf 1: Latar belakang dan pengumuman resmi kebijakan terbaru.
-   - Paragraf 2: Rincian data, mekanisme implementasi, alokasi anggaran, atau integrasi sistem di lapangan.
-   - Paragraf 3: Dampak langsung bagi kesejahteraan warga dan keterbukaan akses layanan publik.
-   - Paragraf 4: Harapan pengawasan partisipatif masyarakat untuk menjamin akuntabilitas.
+   - Paragraf 1: Latar belakang dan fakta peristiwa/kebijakan terbaru yang dilaporkan.
+   - Paragraf 2: Rincian data, mekanisme implementasi, alokasi anggaran, atau konteks regulasi di lapangan.
+   - Paragraf 3: Dampak nyata bagi kesejahteraan masyarakat, pelayanan publik, atau perekonomian rakyat.
+   - Paragraf 4: Poin refleksi pentingnya pengawasan partisipatif warga untuk memastikan keterbukaan informasi.
    - Gunakan gaya bahasa Indonesia yang lugas, baku, dan inspiratif.
-4. KATEGORI & SUMBER: Tetap konsisten dengan konteks isu yang diberikan.
+4. KATEGORI & SUMBER: Tetap sebutkan instansi atau media rujukan resminya (${topicSource}).
 5. FORMAT OUTPUT: Wajib HANYA berupa JSON murni tanpa pembungkus markdown (tanpa \`\`\`json).
 
 Format JSON yang wajib dihasilkan:
@@ -103,16 +132,15 @@ Format JSON yang wajib dihasilkan:
   "duration": "4 Menit Baca"
 }`;
 
-            const userPrompt = `Buatkan artikel berita kebijakan publik komprehensif berdasarkan rujukan dataset berikut:
+            const userPrompt = `Tolong kembangkan dan susun artikel kebijakan publik berkualitas tinggi berdasarkan rujukan data berikut:
 
-Topik Isu / Rilis Kebijakan: ${topicTitle}
-Kategori Isu: ${topicCategory}
-Sumber Resmi: ${topicSource}
-Basis Dataset: ${datasetOrigin}
-Poin Data & Substansi Kunci:
+Sumber / Kantor Berita: ${topicSource}
+Basis Masukan: ${datasetOrigin}
+Judul Berita Awal: ${topicTitle}
+Konteks & Ringkasan Peristiwa:
 ${keyPointsText}
 
-Tuliskan artikel berkualitas tinggi yang siap dipublikasikan ke portal publik MelekIsu.`;
+Buatkan artikel lengkap siap terbit ke portal publik MelekIsu.`;
 
             const candidateModels = [
                 "gemini-3.5-flash-lite",
@@ -154,7 +182,6 @@ Tuliskan artikel berkualitas tinggi yang siap dipublikasikan ke portal publik Me
                     if (parsed.title && parsed.content) {
                         const finalTitle = parsed.title.trim();
                         const baseSlug = generateSlug(finalTitle);
-                        const finalImage = selectedDataset?.defaultImage || getCategoryCoverImage(parsed.category || topicCategory);
 
                         generatedArticle = {
                             title: finalTitle,
@@ -164,7 +191,7 @@ Tuliskan artikel berkualitas tinggi yang siap dipublikasikan ke portal publik Me
                             excerpt: parsed.excerpt || parsed.content.slice(0, 160) + "...",
                             content: parsed.content,
                             duration: parsed.duration || "4 Menit Baca",
-                            image: finalImage,
+                            image: initialCoverImage,
                             date: currentDateStr,
                             likes: 0
                         };
@@ -180,30 +207,30 @@ Tuliskan artikel berkualitas tinggi yang siap dipublikasikan ke portal publik Me
         if (!generatedArticle) {
             const fallbackTitle = topicTitle;
             const fallbackSlug = generateSlug(fallbackTitle);
-            const fallbackContent = `Pemerintah melalui ${topicSource} terus memperkuat keterbukaan dan efektivitas implementasi kebijakan ${topicTitle}. Langkah ini diambil untuk memastikan setiap program pelayanan publik dapat dirasakan manfaatnya secara merata oleh masyarakat luas.\n\nBerdasarkan data pemantauan berkala, koordinasi antarlembaga dan penguatan sistem pengawasan digital terus ditingkatkan. Keterlibatan masyarakat melalui pemberian aspirasi, tanggapan konstruktif, serta pemantauan independen dinilai menjadi pilar krusial dalam menjamin akuntabilitas setiap rupiah anggaran negara yang dialokasikan.\n\nMelalui publikasi berkala pada platform MelekIsu, warga diimbau untuk terus menyimak perkembangan implementasi program ini dan aktif berpartisipasi dalam ruang diskusi publik yang konstruktif.`;
+            const fallbackContent = `Pemerintah bersama ${topicSource} terus memperkuat keterbukaan dan efektivitas implementasi kebijakan ${topicTitle}. Langkah ini menjadi bagian penting dalam memastikan pelayanan publik dapat diakses secara merata oleh masyarakat.\n\nBerdasarkan data dan rilis pemantauan berkala, sinergi antarsektor serta transparansi pengawasan digital terus ditingkatkan. Keterlibatan masyarakat melalui pemberian aspirasi, masukan solutif, serta pemantauan independen dinilai menjadi fondasi utama dalam menjaga akuntabilitas setiap kebijakan publik.\n\nMelalui publikasi berkala pada platform MelekIsu, warga diimbau untuk terus mengawal pelaksanaan program ini secara kritis dan konstruktif.`;
 
             generatedArticle = {
                 title: fallbackTitle,
                 slug: fallbackSlug,
                 category: topicCategory,
                 source: topicSource,
-                excerpt: `Laporan perkembangan terbaru kebijakan ${topicTitle} bersama ${topicSource} untuk meningkatkan transparansi dan keterlibatan publik.`,
+                excerpt: selectedLiveItem?.description || `Laporan perkembangan terbaru kebijakan ${topicTitle} bersama ${topicSource} untuk meningkatkan transparansi publik.`,
                 content: fallbackContent,
                 duration: "3 Menit Baca",
-                image: selectedDataset?.defaultImage || getCategoryCoverImage(topicCategory),
+                image: initialCoverImage,
                 date: currentDateStr,
                 likes: 0
             };
         }
 
-        // 2. Simpan Otomatis ke Database Supabase jika autoPublish disetel true
+        // 3. Simpan Otomatis ke Database Supabase jika autoPublish disetel true
         let supabaseSaved = false;
         let finalSavedSlug = generatedArticle.slug;
         const supabase = getSupabaseClient();
 
         if (autoPublish && supabase) {
             try {
-                // Pastikan slug unik (jika slug sudah ada, beri akhiran angka acak)
+                // Pastikan slug unik
                 const { data: existingNews } = await supabase
                     .from("news")
                     .select("slug")
@@ -246,11 +273,12 @@ Tuliskan artikel berkualitas tinggi yang siap dipublikasikan ke portal publik Me
         return NextResponse.json({
             success: true,
             published: supabaseSaved,
-            datasetUsed: selectedDataset?.title || null,
+            sourceType: selectedLiveItem ? "live_news_api" : (selectedDataset ? "dataset" : "custom"),
+            sourceName: topicSource,
             news: generatedArticle,
             message: supabaseSaved
-                ? `Berita kebijakan berhasil diproduksi AI dan langsung diterbitkan ke Supabase Cloud!`
-                : `Draf berita kebijakan berhasil diproduksi AI dan siap ditinjau.`
+                ? `Berita dari ${topicSource} berhasil dianalisis AI dan langsung diterbitkan ke Supabase Cloud!`
+                : `Draf berita dari ${topicSource} berhasil diproduksi AI dan siap ditinjau.`
         });
 
     } catch (error: any) {
@@ -262,16 +290,32 @@ Tuliskan artikel berkualitas tinggi yang siap dipublikasikan ke portal publik Me
     }
 }
 
-// Handler GET untuk kemudahan webhook cron / pengujian via browser
+// Handler GET: Mendukung fetching live RSS feeds dan webhook cron
 export async function GET(req: Request) {
     const url = new URL(req.url);
+    const action = url.searchParams.get("action");
+
+    // Jika dipanggil dengan action=feed, kembalikan daftar headline live dari website berita luar
+    if (action === "feed") {
+        const sourceId = url.searchParams.get("sourceId") || "antara-politik";
+        const items = await fetchExternalLiveNews(sourceId, 8);
+        return NextResponse.json({
+            success: true,
+            sources: EXTERNAL_NEWS_SOURCES,
+            activeSourceId: sourceId,
+            items: items
+        });
+    }
+
+    // Default: Webhook trigger
     const datasetId = url.searchParams.get("datasetId") || undefined;
     const topic = url.searchParams.get("topic") || undefined;
+    const liveSourceId = url.searchParams.get("liveSourceId") || undefined;
 
     const fakeReq = new Request(req.url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ datasetId, topic, autoPublish: true })
+        body: JSON.stringify({ datasetId, topic, liveSourceId, autoPublish: true })
     });
 
     return POST(fakeReq);
