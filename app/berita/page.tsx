@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { MessageSquare, ThumbsUp, ArrowRight, Send, AlertCircle, X, Search, FileText, HelpCircle, CheckCircle2, Bot, Sparkles } from "lucide-react";
+import { MessageSquare, ThumbsUp, ArrowRight, Send, AlertCircle, Search, FileText, CheckCircle2, Bot, Sparkles } from "lucide-react";
 import { getCombinedNews, sendComment, getCommentsForSlug, isTextViolating } from "@/lib/newsService";
 import { NewsItem } from "@/data/news";
 
@@ -19,7 +19,7 @@ function BeritaContent() {
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    // State untuk Modal Kustom Elegan (Bukan window.confirm bawaan browser)
+    // State untuk Modal Kustom Elegan
     const [pendingSubmit, setPendingSubmit] = useState<{ articleId: string; text: string; articleSlug: string } | null>(null);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -232,7 +232,7 @@ function BeritaContent() {
                         <span className="text-xs font-bold uppercase tracking-wider">Memuat Katalog Berita...</span>
                     </div>
                 ) : filteredNews.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
                         {filteredNews.map((article) => {
                             const isCommentOpen = activeCommentBox === article.id;
                             const isLiked = (article as any).isLiked || false;
@@ -244,9 +244,6 @@ function BeritaContent() {
                                 return false;
                             };
 
-                            // Komentar "Menunggu Verifikasi" HANYA terlihat oleh pengirimnya sendiri
-                            // Publik/user lain hanya melihat komentar "Terverifikasi"
-                            // Komentar Ditolak atau mengandung kata kasar TIDAK PERNAH tampil
                             const visibleComments = (article.commentsList || []).filter((c: any) => {
                                 if (c.status === "Ditolak" || isTextViolating(c.text || "").violated) return false;
                                 if (c.status === "Terverifikasi") return true;
@@ -267,7 +264,7 @@ function BeritaContent() {
                             return (
                                 <article
                                     key={article.id}
-                                    className="flex flex-col justify-between bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md border border-[#DEC0B3]/40 transition-all duration-300 group"
+                                    className="flex flex-col bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md border border-[#DEC0B3]/40 transition-all duration-300 group"
                                 >
                                     <div>
                                         {/* Thumbnail */}
