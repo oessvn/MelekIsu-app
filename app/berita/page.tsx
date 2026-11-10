@@ -190,11 +190,10 @@ function BeritaContent() {
                             <button
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
-                                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap shadow-sm cursor-pointer ${
-                                    selectedCategory === cat
+                                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap shadow-sm cursor-pointer ${selectedCategory === cat
                                         ? "bg-[#9B4000] text-white shadow-md"
                                         : "bg-white text-[#574238] hover:bg-[#FFE3D1]"
-                                }`}
+                                    }`}
                             >
                                 {cat}
                             </button>
@@ -258,7 +257,7 @@ function BeritaContent() {
 
                             const userAlreadyCommented = currentUser
                                 ? (article.commentsList || []).some(
-                                    (c: any) => 
+                                    (c: any) =>
                                         c.status === "Terverifikasi" &&
                                         !isTextViolating(c.text || "").violated &&
                                         (c.authorEmail === currentUser.emailOrPhone || c.author === currentUser.fullName)
@@ -318,11 +317,10 @@ function BeritaContent() {
                                                             return (
                                                                 <div
                                                                     key={c.id}
-                                                                    className={`p-2 rounded-lg border text-[11px] ${
-                                                                        isPending
+                                                                    className={`p-2 rounded-lg border text-[11px] ${isPending
                                                                             ? "bg-amber-50/50 border-amber-200"
                                                                             : "bg-white border-[#DEC0B3]/30"
-                                                                    }`}
+                                                                        }`}
                                                                 >
                                                                     <div className="flex items-center justify-between gap-1 mb-0.5">
                                                                         <strong className="text-[#9B4000]">{c.author}</strong>
@@ -380,16 +378,14 @@ function BeritaContent() {
 
                                             <button
                                                 onClick={() => handleToggleLike(article.id)}
-                                                className={`flex items-center gap-1.5 transition-all cursor-pointer px-2.5 py-1 rounded-full ${
-                                                    isLiked
+                                                className={`flex items-center gap-1.5 transition-all cursor-pointer px-2.5 py-1 rounded-full ${isLiked
                                                         ? "bg-[#FFDDC9] text-[#9B4000] font-bold shadow-xs"
                                                         : "hover:text-[#9B4000] text-[#574238]"
-                                                }`}
+                                                    }`}
                                             >
                                                 <ThumbsUp
-                                                    className={`w-3.5 h-3.5 transition-colors ${
-                                                        isLiked ? "fill-[#9B4000] text-[#9B4000]" : "text-[#8B7266]"
-                                                    }`}
+                                                    className={`w-3.5 h-3.5 transition-colors ${isLiked ? "fill-[#9B4000] text-[#9B4000]" : "text-[#8B7266]"
+                                                        }`}
                                                 />
                                                 <span>{article.likes}</span>
                                             </button>

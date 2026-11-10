@@ -2,6 +2,8 @@
 
 > Platform jurnalisme warga dan transparansi kebijakan publik interaktif untuk menyuarakan aspirasi masyarakat, mengupas warta terkini, serta memantau aksi nyata dari berbagai gagasan sipil secara berimbang dan transparan.
 
+
+
 ---
 
 ## 🛠️ Tech Stack & Arsitektur
