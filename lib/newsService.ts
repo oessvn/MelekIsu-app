@@ -177,7 +177,7 @@ export async function sendComment(
         const modRes = await fetch("/api/moderate-comment", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            signal: AbortSignal.timeout(4000), // Max 4 detik
+            signal: AbortSignal.timeout(6000), // Max 6 detik
             body: JSON.stringify({
                 text: text.trim(),
                 author,
@@ -201,8 +201,8 @@ export async function sendComment(
         console.warn("Gagal terhubung ke endpoint moderasi AI:", err);
     }
 
-    // 2. Simpan ke Supabase Cloud HANYA jika disetujui atau menunggu verifikasi (jangan loloskan yang ditolak)
-    if (moderation.status === "Terverifikasi") {
+    // 2. Simpan ke Supabase Cloud (baik Terverifikasi maupun Menunggu Verifikasi)
+    if (moderation.status === "Terverifikasi" || moderation.status === "Menunggu Verifikasi") {
         try {
             const insertPayload = {
                 news_slug: slug,
@@ -238,8 +238,8 @@ export async function sendComment(
         moderation: moderation,
     };
 
-    // 3. Simpan juga ke LocalStorage HANYA jika lolos
-    if (moderation.status === "Terverifikasi" && typeof window !== "undefined") {
+    // 3. Simpan juga ke LocalStorage jika bukan ditolak
+    if (moderation.status !== "Ditolak" && typeof window !== "undefined") {
         const storageKey = `comments_${slug}`;
         const saved = localStorage.getItem(storageKey);
         let list: NewsComment[] = [];

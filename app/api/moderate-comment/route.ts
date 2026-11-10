@@ -100,17 +100,16 @@ export async function POST(req: Request) {
         const systemPrompt = `Anda adalah Asisten Redaksi & AI Content Moderator untuk platform jurnalisme warga "MelekIsu".
 Tugas utama Anda adalah memverifikasi tanggapan/komentar warga secara cerdas, adil, dan objektif sebelum ditayangkan ke publik.
 
-Kriteria Kurasi (Wajib Dipenuhi Semua):
-1. KESESUAIAN & RELEVANSI DENGAN ISI BERITA (PRIORITAS UTAMA):
-   - Komentar HARUS menanggapi, membahas, atau berkaitan dengan topik, substansi kebijakan, data, atau dampak masyarakat yang diangkat dalam artikel berita terkait.
-   - Boleh berupa opini, kritik terhadap kebijakan pemerintah dalam berita, usulan solusi, apresiasi, atau pertanyaan terkait isi berita.
-   - JIKA komentar sama sekali TIDAK RELEVAN / MELENCENG dari isi berita (contoh: membahas topik acak lain, resep makanan, film, promosi dagang, atau pembicaraan yang tidak ada sangkut pautnya dengan berita ini), maka komentar WAJIB DITOLAK dengan status "Ditolak", isRelevant: false, dan alasan jelas bahwa komentar tidak sesuai dengan topik berita.
-2. BEBAS UJARAN KEBENCIAN & SARA:
+Kriteria Kurasi:
+1. KESESUAIAN & RELEVANSI DENGAN TOPIK BERITA (PRIORITAS UTAMA):
+   - LOLOSKAN ("approved": true, "status": "Terverifikasi", "isRelevant": true): Tanggapan yang menanggapi, membahas, mengkritisi, memberi masukan, bertanya, atau mengemukakan opini terkait substansi, kebijakan, data, atau dampak dari topik berita yang bersangkutan.
+   - TOLAK ("approved": false, "status": "Ditolak", "isRelevant": false): HANYA jika tanggapan benar-benar melenceng total / teks acak tanpa kaitan sama sekali dengan isi berita (misal: "aku siapa kamu siapa", resep masakan, lirik lagu, teks spam).
+2. BEBAS UJARAN KEBENCIAN & MAKIAN KASAR:
    - Tidak memuat makian kasar/kotor, pelecehan personal, ancaman kekerasan, fitnah keji, atau diskriminasi SARA.
 3. BEBAS SPAM & PROMOSI ILEGAL:
    - Tidak mempromosikan judi online, slot gacor, pinjaman ilegal, produk komersial acak, atau tautan penipuan.
 4. KONSTRUKTIF & BERADAB:
-   - Kritik tajam terhadap pemerintah atau kebijakan publik dalam berita SANGAT DIPERBOLEHKAN dan DIHARGAI, asalkan tetap relevan dengan berita dan disampaikan secara beradab.
+   - Kritik tajam terhadap pemerintah atau kebijakan publik dalam berita SANGAT DIPERBOLEHKAN dan DIHARGAI, asalkan tetap relevan dengan topik berita dan disampaikan secara beradab.
 
 Format Jawaban Wajib HANYA JSON murni tanpa markdown:
 {
@@ -118,7 +117,7 @@ Format Jawaban Wajib HANYA JSON murni tanpa markdown:
   "status": "Terverifikasi" atau "Ditolak",
   "isRelevant": true atau false,
   "sentiment": "Konstruktif" | "Kritik Solutif" | "Apresiasi" | "Tidak Relevan" | "Spam" | "Ujaran Kebencian",
-  "reason": "1 kalimat penjelasan objektif dalam bahasa Indonesia mengapa komentar ini disetujui atau ditolak (sebutkan kaitannya dengan isi berita)"
+  "reason": "1 kalimat penjelasan objektif dalam bahasa Indonesia mengapa komentar ini disetujui atau ditolak (sebutkan kaitannya dengan topik berita)"
 }`;
 
         const userPrompt = `Tinjau relevansi dan kelayakan tanggapan warga terhadap berita berikut:
@@ -135,16 +134,15 @@ Pengirim: ${author || "Warga Publik"}
 Isi Tanggapan: "${text.trim()}"
 
 Evaluasi secara seksama:
-1. Apakah tanggapan ini benar-benar sesuai dan relevan dengan isi/topik berita di atas? (Jika tidak relevan / melenceng, tolak dengan isRelevant: false, approved: false, status: "Ditolak").
+1. Apakah tanggapan ini membahas atau berkaitan dengan topik berita di atas? (Loloskan jika relevan; tolak jika benar-benar melenceng).
 2. Apakah bebas ujaran kebencian, makian kotor, dan spam?
 
 Berikan penilaian kurasi Anda dalam format JSON sesuai kriteria di atas.`;
 
         const candidateModels = [
-            "gemini-3.5-flash",
             "gemini-3.5-flash-lite",
-            "gemini-3.8-flash",
-            "gemini-flash-latest"
+            "gemini-3.5-flash",
+            "gemini-3.8-flash"
         ];
 
         let aiParsedResult: any = null;
@@ -156,14 +154,13 @@ Berikan penilaian kurasi Anda dalam format JSON sesuai kriteria di atas.`;
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        signal: AbortSignal.timeout(3000), // Timeout 3 detik agar tidak pernah stuck
+                        signal: AbortSignal.timeout(4000),
                         body: JSON.stringify({
                             systemInstruction: { parts: [{ text: systemPrompt }] },
                             contents: [{ role: "user", parts: [{ text: userPrompt }] }],
                             generationConfig: {
                                 temperature: 0.1,
-                                maxOutputTokens: 1024,
-                                thinkingConfig: { thinkingBudget: 0 }
+                                maxOutputTokens: 1024
                             }
                         })
                     }
