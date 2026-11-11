@@ -6,6 +6,7 @@ import Link from "next/link";
 import { MessageSquare, ThumbsUp, ArrowRight, Send, AlertCircle, Search, FileText, CheckCircle2, Bot, Sparkles } from "lucide-react";
 import { getCombinedNews, sendComment, getCommentsForSlug, isTextViolating } from "@/lib/newsService";
 import { NewsItem } from "@/data/news";
+import { createClient } from "@/lib/supabase/client";
 
 function BeritaContent() {
     const searchParams = useSearchParams();
@@ -45,10 +46,21 @@ function BeritaContent() {
             }
 
             const allNews = await getCombinedNews();
+            const userKey = activeUser ? (JSON.parse(activeUser).emailOrPhone || JSON.parse(activeUser).id || "guest") : "guest";
+            let likedList: string[] = [];
+            try {
+                const raw = localStorage.getItem(`melekisu_liked_articles_${userKey}`);
+                if (raw) likedList = JSON.parse(raw);
+            } catch {}
+
             const mapped = await Promise.all(
                 allNews.map(async (item) => {
                     const comments = await getCommentsForSlug(item.slug);
-                    return { ...item, commentsList: comments };
+                    return { 
+                        ...item, 
+                        commentsList: comments,
+                        isLiked: likedList.includes(item.slug) || likedList.includes(item.id)
+                    };
                 })
             );
 
@@ -77,21 +89,51 @@ function BeritaContent() {
         });
     }, [newsData, selectedCategory, keyword]);
 
-    const handleToggleLike = (id: string) => {
+    const handleToggleLike = async (id: string) => {
+        const userKey = currentUser?.emailOrPhone || currentUser?.id || "guest";
+        const storageKey = `melekisu_liked_articles_${userKey}`;
+        let likedList: string[] = [];
+        try {
+            const raw = localStorage.getItem(storageKey);
+            if (raw) likedList = JSON.parse(raw);
+        } catch {}
+
+        const targetItem = newsData.find((item) => item.id === id);
+        if (!targetItem) return;
+
+        const currentIsLiked = (targetItem as any).isLiked || false;
+        const newIsLiked = !currentIsLiked;
+        const newLikesCount = newIsLiked ? targetItem.likes + 1 : Math.max(0, targetItem.likes - 1);
+
+        if (newIsLiked) {
+            if (!likedList.includes(targetItem.slug)) likedList.push(targetItem.slug);
+        } else {
+            likedList = likedList.filter((s) => s !== targetItem.slug && s !== targetItem.id);
+        }
+
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(likedList));
+            localStorage.setItem("melekisu_liked_articles_all", JSON.stringify(likedList));
+            window.dispatchEvent(new Event("storage"));
+        } catch {}
+
         setNewsData((prev) =>
             prev.map((item) => {
                 if (item.id === id) {
-                    const currentIsLiked = (item as any).isLiked || false;
-                    const newIsLiked = !currentIsLiked;
                     return {
                         ...item,
                         isLiked: newIsLiked,
-                        likes: newIsLiked ? item.likes + 1 : item.likes - 1,
+                        likes: newLikesCount,
                     };
                 }
                 return item;
             })
         );
+
+        try {
+            const supabase = createClient();
+            await supabase.from("news").update({ likes: newLikesCount }).eq("slug", targetItem.slug);
+        } catch {}
     };
 
     // Handler validasi sebelum memicu modal kustom

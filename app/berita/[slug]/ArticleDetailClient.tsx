@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, MessageSquare, ThumbsUp, Send, AlertCircle, Building2, Calendar, Clock, CheckCircle2, HelpCircle, FileText, Bot, Sparkles } from "lucide-react";
 import { getCombinedNews, getCommentsForSlug, sendComment, isTextViolating } from "@/lib/newsService";
 import { NewsItem, NewsComment } from "@/data/news";
+import { createClient } from "@/lib/supabase/client";
 
 export default function ArticleDetailClient({ slug }: { slug: string }) {
     const [articleData, setArticleData] = useState<NewsItem | null>(null);
@@ -68,6 +69,17 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
                             (parsedUser.fullName && c.author === parsedUser.fullName))
                     );
                     setUserSubmissionCount(alreadyCommented ? 1 : 0);
+
+                    // Cek status like artikel oleh pengguna ini
+                    const userKey = parsedUser.emailOrPhone || parsedUser.id || "guest";
+                    const storageKey = `melekisu_liked_articles_${userKey}`;
+                    const rawLikes = localStorage.getItem(storageKey);
+                    if (rawLikes) {
+                        try {
+                            const listLikes: string[] = JSON.parse(rawLikes);
+                            setIsLiked(listLikes.includes(articleData.slug));
+                        } catch {}
+                    }
                 } catch {
                     setCurrentUser(null);
                 }
@@ -121,14 +133,37 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
         return false;
     });
 
-    const handleToggleLike = () => {
-        if (isLiked) {
-            setLikes(likes - 1);
-            setIsLiked(false);
+    const handleToggleLike = async () => {
+        const userKey = currentUser?.emailOrPhone || currentUser?.id || "guest";
+        const storageKey = `melekisu_liked_articles_${userKey}`;
+        let likedList: string[] = [];
+        try {
+            const raw = localStorage.getItem(storageKey);
+            if (raw) likedList = JSON.parse(raw);
+        } catch {}
+
+        const nowLiked = !isLiked;
+        setIsLiked(nowLiked);
+        const newLikesCount = nowLiked ? likes + 1 : Math.max(0, likes - 1);
+        setLikes(newLikesCount);
+
+        if (nowLiked) {
+            if (!likedList.includes(slug)) likedList.push(slug);
         } else {
-            setLikes(likes + 1);
-            setIsLiked(true);
+            likedList = likedList.filter((s) => s !== slug);
         }
+
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(likedList));
+            localStorage.setItem("melekisu_liked_articles_all", JSON.stringify(likedList));
+            window.dispatchEvent(new Event("storage"));
+        } catch {}
+
+        // Sinkronkan ke Supabase jika artikel ada di database
+        try {
+            const supabase = createClient();
+            await supabase.from("news").update({ likes: newLikesCount }).eq("slug", slug);
+        } catch {}
     };
 
     const handleInitialSubmit = (e: React.FormEvent) => {
