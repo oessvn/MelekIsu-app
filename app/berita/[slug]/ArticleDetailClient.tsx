@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, MessageSquare, ThumbsUp, Send, AlertCircle, Building2, Calendar, Clock, CheckCircle2, HelpCircle, FileText, Bot, Sparkles } from "lucide-react";
 import { getCombinedNews, getCommentsForSlug, sendComment, isTextViolating, toggleCommentUpvote, getCommentUpvoteCount, isCommentUpvotedByUser } from "@/lib/newsService";
 import { NewsItem, NewsComment } from "@/data/news";
+import { getCategoryCoverImage } from "@/lib/policyDatasets";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ArticleDetailClient({ slug }: { slug: string }) {
@@ -327,7 +328,13 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
                     {articleData.image ? (
                         <img
                             src={articleData.image}
-                            alt={articleData.title}
+                            alt=""
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                                const target = e.currentTarget;
+                                target.onerror = null;
+                                target.src = getCategoryCoverImage(articleData.category || "");
+                            }}
                             className="w-full h-full object-cover"
                         />
                     ) : (

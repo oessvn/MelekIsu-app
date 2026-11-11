@@ -6,6 +6,7 @@ import Link from "next/link";
 import { MessageSquare, ThumbsUp, ArrowRight, Send, AlertCircle, Search, FileText, CheckCircle2, Bot, Sparkles, ArrowUpDown } from "lucide-react";
 import { getCombinedNews, sendComment, getCommentsForSlug, isTextViolating, toggleCommentUpvote, getCommentUpvoteCount, isCommentUpvotedByUser } from "@/lib/newsService";
 import { NewsItem } from "@/data/news";
+import { getCategoryCoverImage } from "@/lib/policyDatasets";
 import { createClient } from "@/lib/supabase/client";
 
 function matchCategory(itemCategory: string, selected: string): boolean {
@@ -466,7 +467,13 @@ function BeritaContent() {
                                             {article.image ? (
                                                 <img
                                                     src={article.image}
-                                                    alt={article.title}
+                                                    alt=""
+                                                    referrerPolicy="no-referrer"
+                                                    onError={(e) => {
+                                                        const target = e.currentTarget;
+                                                        target.onerror = null;
+                                                        target.src = getCategoryCoverImage(article.category || "");
+                                                    }}
                                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                                 />
                                             ) : (

@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { getCombinedNews, getCommentsForSlug, sendComment, isTextViolating } from "@/lib/newsService";
 import { NewsItem } from "@/data/news";
+import { getCategoryCoverImage } from "@/lib/policyDatasets";
 import { createClient } from "@/lib/supabase/client";
 import { Lightbulb, MessageSquare, ThumbsUp, ArrowRight, FileText, CheckCircle2, Clock, Send, AlertCircle, HelpCircle, Bot, Sparkles } from "lucide-react";
 
@@ -346,7 +347,13 @@ export default function HomePage() {
                 <>
                   <img
                     src={featuredNews.image}
-                    alt={featuredNews.title}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      target.onerror = null;
+                      target.src = getCategoryCoverImage(getCategoryName(featuredNews));
+                    }}
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                   />
                   {/* Efek Gradasi Gelap agar Teks Sangat Jelas Dibaca */}
@@ -550,7 +557,13 @@ export default function HomePage() {
                   {article.image ? (
                     <img
                       src={article.image}
-                      alt={article.title}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        target.onerror = null;
+                        target.src = getCategoryCoverImage(getCategoryName(article));
+                      }}
                       className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                   ) : (

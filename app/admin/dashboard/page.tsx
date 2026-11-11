@@ -762,7 +762,17 @@ export default function AdminDashboardPage() {
                                     <td className="py-3 pr-3 w-16">
                                         <div className="w-12 h-10 rounded-lg bg-[#FFE3D1] overflow-hidden flex items-center justify-center text-[#9B4000] border border-[#DEC0B3]/50 shrink-0">
                                             {art.image ? (
-                                                <img src={art.image} alt={art.title} className="w-full h-full object-cover" />
+                                                <img 
+                                                    src={art.image} 
+                                                    alt="" 
+                                                    referrerPolicy="no-referrer"
+                                                    onError={(e) => {
+                                                        const target = e.currentTarget;
+                                                        target.onerror = null;
+                                                        target.src = getCategoryCoverImage(art.category || "");
+                                                    }}
+                                                    className="w-full h-full object-cover" 
+                                                />
                                             ) : (
                                                 <FileText className="w-5 h-5 opacity-60" />
                                             )}
