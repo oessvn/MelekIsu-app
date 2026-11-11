@@ -91,10 +91,11 @@ export async function fetchExternalLiveNews(sourceId?: string, limit: number = 6
             const rawDesc = raw.match(/<description>([\s\S]*?)<\/description>/)?.[1] || "";
             const rawPubDate = raw.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || "";
 
-            // Deteksi enclosure gambar atau media:content
+            // Deteksi enclosure gambar, media:content, tag img, atau URL gambar
             const rawImg = raw.match(/<enclosure[^>]+url=["']([^"']+)["']/i)?.[1] 
                 || raw.match(/<media:content[^>]+url=["']([^"']+)["']/i)?.[1]
                 || raw.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1]
+                || raw.match(/https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)(?:\?[^\s"'<>]*)?/i)?.[0]
                 || "";
 
             const title = cleanXmlText(rawTitle);

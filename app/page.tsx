@@ -2,58 +2,62 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { sendComment, isTextViolating } from "@/lib/newsService";
+import { getCombinedNews, getCommentsForSlug, sendComment, isTextViolating } from "@/lib/newsService";
+import { NewsItem } from "@/data/news";
+import { createClient } from "@/lib/supabase/client";
 import { Lightbulb, MessageSquare, ThumbsUp, ArrowRight, FileText, CheckCircle2, Clock, Send, AlertCircle, HelpCircle, Bot, Sparkles } from "lucide-react";
 
-// Data berita dengan link gambar langsung yang dijamin langsung tampil
-const mockNews = [
-  {
-    id: "1",
-    title: "Revolusi Mobilitas Berkelanjutan: Integrasi Transit Nol Emisi di Seluruh Koridor Urban 2025",
-    slug: "revolusi-mobilitas-berkelanjutan",
-    excerpt: "Kementerian Perhubungan bersama konsorsium metropolitan meluncurkan sinkronisasi jadwal tunggal dan tarif gabungan untuk kereta cepat dan bus listrik.",
-    category: { name: "Infrastruktur Publik" },
-    source: "Humas KCIC",
-    publishedAt: "2025-10-18",
-    image: "/images/infrastruktur.jpg",
-  },
-  {
-    id: "2",
-    title: "Digitalisasi Pertanian Rakyat: Meningkatkan Hasil Panen Mandiri",
-    slug: "digitalisasi-pertanian-rakyat",
-    excerpt: "Penerapan sensor kelembaban tanah berbiaya terjangkau meningkatkan margin keuntungan petani lokal hingga 34%.",
-    category: { name: "Ketahanan Pangan" },
-    source: "Wawasan Agraria",
-    publishedAt: "2025-10-18",
-    image: "/images/petani.jpg",
-  },
-  {
-    id: "3",
-    title: "Akselerasi Literasi AI & Coding untuk 50.000 Mahasiswa Vokasi",
-    slug: "akselerasi-literasi-ai",
-    excerpt: "Kemitraan politeknik negeri membuka sertifikasi kompetensi rekayasa data gratis bagi mahasiswa luar pulau Jawa.",
-    category: { name: "Pendidikan & Talenta" },
-    source: "Inovasi Vokasi",
-    publishedAt: "2025-10-17",
-    image: "/images/guru.jpg",
-  },
-  {
-    id: "4",
-    title: "Portal Satu Data Anggaran Terbuka: Setiap Rupiah Terpantau Publik",
-    slug: "portal-satu-data-anggaran",
-    excerpt: "Dashboard analitik real-time memungkinkan warga memantau pengadaan tender dan progres fisik pekerjaan umum.",
-    category: { name: "Tata Kelola Publik" },
-    source: "Transparansi Keuangan",
-    publishedAt: "2025-10-16",
-    image: "/images/rupiah.jpg",
-  },
-];
+function matchCategory(itemCategory: any, selected: string): boolean {
+  if (selected === "Semua") return true;
+  if (!itemCategory) return false;
+  const cat = (typeof itemCategory === "object" ? itemCategory?.name || "" : String(itemCategory)).toLowerCase().trim();
+  const sel = selected.toLowerCase().trim();
+  if (cat === sel) return true;
+  if (sel.includes("infrastruktur") && cat.includes("infrastruktur")) return true;
+  if (sel.includes("pangan") && cat.includes("pangan")) return true;
+  if ((sel.includes("pendidikan") || sel.includes("talenta") || sel.includes("sdm")) && 
+      (cat.includes("pendidikan") || cat.includes("talenta") || cat.includes("sdm"))) return true;
+  if ((sel.includes("tata kelola") || sel.includes("transparansi")) && 
+      (cat.includes("tata kelola") || cat.includes("transparansi"))) return true;
+  if ((sel.includes("energi") || sel.includes("lingkungan")) && 
+      (cat.includes("energi") || cat.includes("lingkungan"))) return true;
+  return cat.includes(sel) || sel.includes(cat);
+}
+
+function parseNewsTimestamp(item: any): number {
+  if (item.createdAt) {
+    const time = new Date(item.createdAt).getTime();
+    if (!isNaN(time)) return time;
+  }
+  if (item.date) {
+    const str = item.date.trim();
+    const parts = str.split(/\s+/);
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const monthStr = parts[1].toLowerCase();
+      const year = parseInt(parts[2], 10);
+      const months: Record<string, number> = {
+        januari: 0, februari: 1, maret: 2, april: 3, mei: 4, juni: 5,
+        juli: 6, agustus: 7, september: 8, oktober: 9, november: 10, desember: 11
+      };
+      if (!isNaN(day) && !isNaN(year) && months[monthStr] !== undefined) {
+        return new Date(year, months[monthStr], day).getTime();
+      }
+    }
+    const time = new Date(str).getTime();
+    if (!isNaN(time)) return time;
+  }
+  const numId = parseInt(item.id, 10);
+  return !isNaN(numId) ? numId : 0;
+}
 
 export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState("Semua");
+  const [newsList, setNewsList] = useState<NewsItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // State Interaktif untuk Like & Komentar Fungsional
-  const [likesCount, setLikesCount] = useState(1280);
+  const [likesCount, setLikesCount] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
   const [commentsList, setCommentsList] = useState<any[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -63,6 +67,17 @@ export default function HomePage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [userAlert, setUserAlert] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: "info" | "error" | "success";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
   const [moderationFeedback, setModerationFeedback] = useState<{
     approved: boolean;
     status: string;
@@ -70,10 +85,54 @@ export default function HomePage() {
     sentiment?: string;
   } | null>(null);
 
-  // Sinkronisasi komentar & user dari localStorage
+  // 1. Ambil seluruh berita (Supabase & fallback), diurutkan kronologis terbaru
   useEffect(() => {
-    const syncData = () => {
-      // 1. Ambil user login aktif
+    const loadNews = async () => {
+      try {
+        const all = await getCombinedNews();
+        const sorted = [...all].sort((a, b) => parseNewsTimestamp(b) - parseNewsTimestamp(a));
+        setNewsList(sorted);
+      } catch (e) {
+        console.error("Gagal memuat berita beranda:", e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadNews();
+  }, []);
+
+  const availableCategories = useMemo(() => {
+    const base = [
+      "Semua",
+      "Infrastruktur Publik",
+      "Ketahanan Pangan",
+      "Pendidikan & Talenta",
+      "Tata Kelola Publik",
+      "Energi & Lingkungan"
+    ];
+    newsList.forEach((item) => {
+      const cat = typeof item.category === "object" ? (item.category as any)?.name : item.category;
+      if (cat && !base.some((b) => matchCategory(cat, b))) {
+        base.push(cat);
+      }
+    });
+    return base;
+  }, [newsList]);
+
+  const filteredNews = useMemo(() => {
+    return newsList.filter((item) => matchCategory(item.category, selectedCategory));
+  }, [newsList, selectedCategory]);
+
+  const featuredNews = filteredNews[0] || newsList[0];
+  const latestNews = filteredNews.slice(1);
+
+  // 2. Sinkronisasi data interaktif berita featured saat berita berubah
+  useEffect(() => {
+    if (!featuredNews) return;
+
+    const syncInteractiveData = async () => {
+      // Ambil user login aktif
       const activeUser = localStorage.getItem("current_user");
       let parsedUser = null;
       if (activeUser) {
@@ -87,29 +146,24 @@ export default function HomePage() {
         setCurrentUser(null);
       }
 
-      // 2. Ambil komentar berita featured (revolusi-mobilitas-berkelanjutan)
-      const storageKey = "comments_revolusi-mobilitas-berkelanjutan";
-      const savedComments = localStorage.getItem(storageKey);
-      let list: any[] = [];
-      if (savedComments) {
-        try {
-          list = JSON.parse(savedComments);
-        } catch {
-          list = [];
-        }
-      } else {
-        list = [
-          { id: "c1-1", author: "Budi Santoso", text: "Integrasi jadwal ini sangat membantu mobilitas harian saya.", status: "Terverifikasi" },
-          { id: "c1-2", author: "Siti Rahma", text: "Semoga koridornya bisa segera diperluas ke kota penyangga.", status: "Terverifikasi" },
-        ];
-        localStorage.setItem(storageKey, JSON.stringify(list));
-      }
+      // Ambil status suka (likes)
+      const userKey = parsedUser ? (parsedUser.emailOrPhone || parsedUser.id || "guest") : "guest";
+      let likedList: string[] = [];
+      try {
+        const raw = localStorage.getItem(`melekisu_liked_articles_${userKey}`);
+        if (raw) likedList = JSON.parse(raw);
+      } catch {}
 
-      setCommentsList(list);
+      setHasLiked(likedList.includes(featuredNews.slug) || likedList.includes(featuredNews.id));
+      setLikesCount(featuredNews.likes || 0);
 
-      // Cek apakah user saat ini sudah pernah komentar di artikel ini
+      // Ambil komentar untuk featured article
+      const comments = await getCommentsForSlug(featuredNews.slug);
+      setCommentsList(comments);
+
+      // Cek apakah user sudah mengirim komentar
       if (parsedUser) {
-        const hasCommented = list.some(
+        const hasCommented = comments.some(
           (c: any) =>
             c.status === "Terverifikasi" &&
             !isTextViolating(c.text || "").violated &&
@@ -122,12 +176,10 @@ export default function HomePage() {
       }
     };
 
-    syncData();
-    window.addEventListener("storage", syncData);
-    return () => window.removeEventListener("storage", syncData);
-  }, []);
+    syncInteractiveData();
+  }, [featuredNews?.slug]);
 
-  // Filter komentar publik di Hero: Hanya Terverifikasi atau milik pengguna aktif
+  // Filter komentar publik di Hero
   const isAuthorOfComment = (c: any) => {
     if (!currentUser) return false;
     const authorName = c.author || c.user;
@@ -143,30 +195,58 @@ export default function HomePage() {
     return false;
   });
 
-  // Handler Like
-  const handleLikeClick = () => {
-    if (hasLiked) {
-      setLikesCount((prev) => prev - 1);
-      setHasLiked(false);
+  // Handler Like Berita Featured
+  const handleLikeClick = async () => {
+    if (!featuredNews) return;
+    const userKey = currentUser ? (currentUser.emailOrPhone || currentUser.id || "guest") : "guest";
+    const storageKey = `melekisu_liked_articles_${userKey}`;
+    let likedList: string[] = [];
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) likedList = JSON.parse(raw);
+    } catch {}
+
+    const newLiked = !hasLiked;
+    const newCount = newLiked ? likesCount + 1 : Math.max(0, likesCount - 1);
+    setHasLiked(newLiked);
+    setLikesCount(newCount);
+
+    if (newLiked) {
+      if (!likedList.includes(featuredNews.slug)) likedList.push(featuredNews.slug);
     } else {
-      setLikesCount((prev) => prev + 1);
-      setHasLiked(true);
+      likedList = likedList.filter((s) => s !== featuredNews.slug && s !== featuredNews.id);
     }
+
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(likedList));
+      const supabase = createClient();
+      await supabase.from("news").update({ likes: newCount }).eq("slug", featuredNews.slug);
+    } catch {}
   };
 
-  // Handler Awal Submit (Validasi login & kuota)
+  // Handler Awal Submit
   const handleInitialSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!currentUser) {
-      alert("Silakan Masuk atau Daftar terlebih dahulu untuk mengirim tanggapan.");
+      setUserAlert({
+        isOpen: true,
+        title: "Akses Masuk Diperlukan",
+        message: "Silakan Masuk atau Daftar terlebih dahulu untuk mengirim tanggapan warga.",
+        type: "info"
+      });
       return;
     }
 
     if (!newComment.trim()) return;
 
     if (userSubmissionCount >= 1) {
-      alert("Batas kuota tercapai: Anda sudah mengirimkan 1 tanggapan pada artikel berita ini.");
+      setUserAlert({
+        isOpen: true,
+        title: "Batas Kuota Tercapai",
+        message: "Anda sudah mengirimkan 1 tanggapan pada artikel berita ini. Kuota dibatasi 1 per artikel agar ruang diskusi tetap berimbang.",
+        type: "info"
+      });
       return;
     }
 
@@ -175,14 +255,14 @@ export default function HomePage() {
 
   // Handler Eksekusi Kirim dengan Verifikasi Otomatis AI
   const handleConfirmSend = async () => {
-    if (!currentUser) return;
+    if (!currentUser || !featuredNews) return;
 
     setShowConfirmModal(false);
     setIsSending(true);
 
     try {
       const newCommentItem = await sendComment(
-        "revolusi-mobilitas-berkelanjutan",
+        featuredNews.slug,
         currentUser.fullName,
         currentUser.emailOrPhone || "",
         newComment.trim(),
@@ -208,22 +288,22 @@ export default function HomePage() {
       setShowSuccessModal(true);
     } catch (err) {
       console.error("Gagal mengirim tanggapan:", err);
-      alert("Terjadi kendala saat mengirim tanggapan. Silakan coba kembali.");
+      setUserAlert({
+        isOpen: true,
+        title: "Kendala Pengiriman",
+        message: "Terjadi kendala saat mengirim tanggapan. Silakan coba kembali dalam beberapa saat.",
+        type: "error"
+      });
     } finally {
       setIsSending(false);
     }
   };
 
-  const filteredNews = useMemo(() => {
-    return mockNews.filter((item) => {
-      const matchesCategory =
-        selectedCategory === "Semua" || item.category.name === selectedCategory;
-      return matchesCategory;
-    });
-  }, [selectedCategory]);
-
-  const featuredNews = filteredNews[0] || mockNews[0];
-  const latestNews = filteredNews.slice(1);
+  const getCategoryName = (item: any) => {
+    if (!item) return "Kebijakan Publik";
+    if (typeof item.category === "object") return item.category?.name || "Kebijakan Publik";
+    return String(item.category || "Kebijakan Publik");
+  };
 
   return (
     <div className="min-h-screen bg-[#FFF8F5] text-[#28180C] selection:bg-[#FDB659]/30">
@@ -232,7 +312,7 @@ export default function HomePage() {
       <section className="sticky top-20 z-40 bg-[#FFF8F5]/90 backdrop-blur-md border-b border-[#DEC0B3]/30 shadow-sm">
         <div className="max-w-[1360px] mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2 overflow-x-auto w-full pb-1 md:pb-0 scrollbar-none">
-            {["Semua", "Infrastruktur Publik", "Ketahanan Pangan", "Pendidikan & Talenta", "Tata Kelola Publik"].map((cat) => (
+            {availableCategories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
@@ -251,13 +331,18 @@ export default function HomePage() {
       {/* Main Container */}
       <main className="max-w-[1360px] mx-auto px-6 py-8 flex flex-col gap-12">
 
-        {/* Hero Spotlight Section (Sorotan Utama Redaksi) */}
-        {featuredNews ? (
+        {/* Hero Spotlight Section (Sorotan Utama Redaksi Berita Terbaru) */}
+        {isLoading ? (
+          <div className="py-20 text-center text-[#9B4000] flex flex-col items-center gap-2">
+            <div className="w-8 h-8 border-3 border-[#9B4000] border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-xs font-bold uppercase tracking-wider">Memuat Berita Sorotan Terkini...</span>
+          </div>
+        ) : featuredNews ? (
           <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
 
             {/* Left Visual Banner */}
             <div className="lg:col-span-7 relative group rounded-3xl overflow-hidden shadow-md flex flex-col justify-between p-6 sm:p-8 min-h-[360px] sm:min-h-[420px] transition-all duration-500 border border-[#DEC0B3]/40 bg-[#28180C]">
-              {featuredNews.image && (
+              {featuredNews.image ? (
                 <>
                   <img
                     src={featuredNews.image}
@@ -267,6 +352,8 @@ export default function HomePage() {
                   {/* Efek Gradasi Gelap agar Teks Sangat Jelas Dibaca */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/75 to-black/45"></div>
                 </>
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-[#402010] to-[#1a0c06]" />
               )}
 
               <div className="flex flex-col gap-6 relative z-10">
@@ -278,7 +365,7 @@ export default function HomePage() {
 
                 <div className="space-y-3">
                   <span className="text-xs font-bold tracking-widest text-[#FFDDC9] uppercase drop-shadow-sm">
-                    {featuredNews.category.name}
+                    {getCategoryName(featuredNews)}
                   </span>
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug text-white group-hover:text-[#FFDDC9] transition-colors drop-shadow-md">
                     {featuredNews.title}
@@ -309,10 +396,10 @@ export default function HomePage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="bg-[#FFE3D1] text-[#9B4000] text-[11px] font-extrabold px-3 py-1 rounded-full tracking-wide uppercase">
-                    {featuredNews.category.name}
+                    {getCategoryName(featuredNews)}
                   </span>
                   <span className="text-[11px] font-medium text-[#8B7266]">
-                    5 Menit Baca
+                    {featuredNews.duration || "5 Menit Baca"}
                   </span>
                 </div>
 
@@ -331,7 +418,7 @@ export default function HomePage() {
                     <span>Ringkasan Fakta & Dampak Langsung:</span>
                   </span>
                   <ul className="text-[11px] text-[#574238] space-y-1 pl-4 list-disc">
-                    <li>Transparansi data real-time & akuntabilitas anggaran terverifikasi.</li>
+                    <li>Transparansi data real-time & akuntabilitas kebijakan publik.</li>
                     <li>Partisipasi aktif warga melalui kanal kuota esai berbobot.</li>
                   </ul>
                 </div>
@@ -351,7 +438,7 @@ export default function HomePage() {
                     ) : userSubmissionCount >= 1 ? (
                       <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-center gap-2 text-[11px] text-amber-800 font-medium">
                         <AlertCircle className="w-4 h-4 shrink-0 text-amber-700" />
-                        <span>Anda telah menggunakan 1 kuota tanggapan pada berita ini. Komentar Anda sedang dalam peninjauan sistem.</span>
+                        <span>Anda telah menggunakan kuota 1 tanggapan pada berita ini. Komentar Anda sedang dalam peninjauan sistem.</span>
                       </div>
                     ) : (
                       <form onSubmit={handleInitialSubmit} className="flex gap-2">
@@ -370,53 +457,34 @@ export default function HomePage() {
                     )}
 
                     {/* List Komentar Interaktif */}
-                    {(() => {
-                      const isAuthorOfComment = (c: any) => {
-                        if (!currentUser) return false;
-                        const authorName = c.author || c.user;
-                        if (currentUser.emailOrPhone && c.authorEmail && c.authorEmail.toLowerCase() === currentUser.emailOrPhone.toLowerCase()) return true;
-                        if (currentUser.fullName && authorName && authorName.toLowerCase() === currentUser.fullName.toLowerCase()) return true;
-                        return false;
-                      };
-
-                      const visibleComments = commentsList.filter((c) => {
-                        if (c.status === "Terverifikasi") return true;
-                        if (isAuthorOfComment(c)) return true;
-                        return false;
-                      });
-
-                      return (
-                        <div className="max-h-36 overflow-y-auto space-y-2 pr-1">
-                          {visibleComments.length === 0 ? (
-                            <p className="text-[11px] text-[#8B7266] italic text-center py-2">Belum ada tanggapan warga yang terverifikasi.</p>
-                          ) : (
-                            visibleComments.map((c) => {
-                              const authorName = c.author || c.user;
-                              const isPending = c.status === "Menunggu Verifikasi";
-                              return (
-                                <div key={c.id} className="bg-white p-3 rounded-xl text-xs border border-[#DEC0B3]/30 shadow-2xs space-y-1">
-                                  <div className="flex items-center justify-between gap-1">
-                                    <strong className="text-[#9B4000] text-xs truncate">{authorName}</strong>
-                                    {isPending ? (
-                                      <span className="text-[10px] text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shrink-0" title="Komentar hanya terlihat oleh Anda sampai disetujui admin">
-                                        <Clock className="w-2.5 h-2.5 text-amber-700 animate-pulse" />
-                                        <span>Menunggu Verifikasi (Hanya Anda)</span>
-                                      </span>
-                                    ) : (
-                                      <span className="text-[10px] text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shrink-0">
-                                        <CheckCircle2 className="w-2.5 h-2.5 text-emerald-700" />
-                                        <span>Terverifikasi</span>
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className="text-[#574238] text-[11px] leading-relaxed">{c.text}</p>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      );
-                    })()}
+                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                      {visibleHeroComments.length === 0 ? (
+                        <p className="text-[11px] text-[#8B7266] italic text-center py-2">Belum ada tanggapan untuk sorotan berita ini.</p>
+                      ) : (
+                        visibleHeroComments.map((c) => {
+                          const isPending = c.status === "Menunggu Verifikasi";
+                          return (
+                            <div key={c.id} className="bg-white p-2.5 rounded-xl border border-[#DEC0B3]/40 text-xs">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-bold text-[#28180C] text-[11px]">{c.author || c.user}</span>
+                                {isPending ? (
+                                  <span className="text-[10px] text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shrink-0" title="Komentar hanya terlihat oleh Anda sampai disetujui admin">
+                                    <Clock className="w-2.5 h-2.5 text-amber-700 animate-pulse" />
+                                    <span>Menunggu Verifikasi (Hanya Anda)</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shrink-0">
+                                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-700" />
+                                    <span>Terverifikasi</span>
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[#574238] text-[11px] leading-relaxed">{c.text}</p>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -455,7 +523,11 @@ export default function HomePage() {
             </div>
 
           </section>
-        ) : null}
+        ) : (
+          <div className="text-center py-12 text-xs text-[#8B7266]">
+            Belum ada berita yang tersedia untuk kategori ini.
+          </div>
+        )}
 
         {/* Section Heading */}
         <div className="flex items-center justify-between pt-4 border-t border-[#DEC0B3]/40">
@@ -487,7 +559,7 @@ export default function HomePage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
                   <div className="absolute top-3 left-3 z-10">
                     <span className="bg-[#FDB659] text-[#724700] px-3 py-1 rounded-full text-[11px] font-bold uppercase shadow-xs">
-                      {article.category.name}
+                      {getCategoryName(article)}
                     </span>
                   </div>
                 </div>
@@ -516,6 +588,40 @@ export default function HomePage() {
         </section>
 
       </main>
+
+      {/* Modal Dialog Notifikasi Pengguna */}
+      {userAlert.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-[#DEC0B3]/40 flex flex-col items-center text-center gap-4">
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center shadow-inner ${
+              userAlert.type === "error"
+                ? "bg-rose-50 text-rose-600 border border-rose-200"
+                : userAlert.type === "success"
+                ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                : "bg-amber-50 text-amber-700 border border-amber-200"
+            }`}>
+              {userAlert.type === "error" ? (
+                <AlertCircle className="w-8 h-8" />
+              ) : userAlert.type === "success" ? (
+                <CheckCircle2 className="w-8 h-8" />
+              ) : (
+                <AlertCircle className="w-8 h-8" />
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-extrabold text-[#28180C]">{userAlert.title}</h3>
+              <p className="text-xs text-[#574238] leading-relaxed">{userAlert.message}</p>
+            </div>
+            <button
+              onClick={() => setUserAlert((prev) => ({ ...prev, isOpen: false }))}
+              className="w-full mt-1 py-2.5 px-4 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+            >
+              Mengerti
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Modal Konfirmasi Pengiriman Komentar dengan AI */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
