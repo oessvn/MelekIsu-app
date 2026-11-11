@@ -14,6 +14,7 @@ export async function getCombinedNews(): Promise<NewsItem[]> {
         const { data: dbNews, error } = await supabase
             .from("news")
             .select("*")
+            .neq("category", "Transparansi Aksi")
             .order("created_at", { ascending: false });
 
         if (!error && dbNews && dbNews.length > 0) {
