@@ -855,6 +855,7 @@ export default function AdminDashboardPage() {
                                         <option value="Ketahanan Pangan">Ketahanan Pangan</option>
                                         <option value="Pendidikan & Talenta">Pendidikan & Talenta</option>
                                         <option value="Tata Kelola Publik">Tata Kelola Publik</option>
+                                        <option value="Energi & Lingkungan">Energi & Lingkungan</option>
                                     </select>
                                 </div>
 

@@ -6,6 +6,7 @@ export interface NewsComment {
     status?: "Terverifikasi" | "Menunggu Verifikasi" | "Ditolak";
     aiReason?: string;
     createdAt?: string;
+    upvotes?: number;
 }
 
 export interface NewsItem {

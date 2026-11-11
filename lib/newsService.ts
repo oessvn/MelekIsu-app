@@ -63,6 +63,72 @@ export async function getCombinedNews(): Promise<NewsItem[]> {
 }
 
 /**
+ * Mengambil total upvote sebuah komentar dari storage
+ */
+export function getCommentUpvoteCount(commentId: string): number {
+    if (typeof window === "undefined") return 0;
+    try {
+        const stored = localStorage.getItem(`comment_upvotes_${commentId}`);
+        if (!stored) return 0;
+        const parsed = JSON.parse(stored);
+        return typeof parsed.count === "number" ? parsed.count : (Array.isArray(parsed.users) ? parsed.users.length : 0);
+    } catch {
+        return 0;
+    }
+}
+
+/**
+ * Mengecek apakah user tertentu sudah upvote komentar ini
+ */
+export function isCommentUpvotedByUser(commentId: string, userKey: string): boolean {
+    if (typeof window === "undefined" || !userKey) return false;
+    try {
+        const stored = localStorage.getItem(`comment_upvotes_${commentId}`);
+        if (!stored) return false;
+        const parsed = JSON.parse(stored);
+        const users = Array.isArray(parsed.users) ? parsed.users : [];
+        return users.includes(userKey);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Toggle upvote pada komentar oleh user
+ */
+export async function toggleCommentUpvote(
+    commentId: string, 
+    userKey: string
+): Promise<{ count: number; isUpvoted: boolean }> {
+    if (typeof window === "undefined") return { count: 0, isUpvoted: false };
+    try {
+        const storageKey = `comment_upvotes_${commentId}`;
+        const stored = localStorage.getItem(storageKey);
+        let parsed = stored ? JSON.parse(stored) : { count: 0, users: [] };
+        let users: string[] = Array.isArray(parsed.users) ? parsed.users : [];
+        let count: number = typeof parsed.count === "number" ? parsed.count : users.length;
+
+        let isUpvoted: boolean;
+        if (users.includes(userKey)) {
+            users = users.filter((u) => u !== userKey);
+            count = Math.max(0, count - 1);
+            isUpvoted = false;
+        } else {
+            users.push(userKey);
+            count += 1;
+            isUpvoted = true;
+        }
+
+        localStorage.setItem(storageKey, JSON.stringify({ count, users }));
+        window.dispatchEvent(new Event("storage"));
+
+        return { count, isUpvoted };
+    } catch {
+        return { count: 0, isUpvoted: false };
+    }
+}
+
+/**
  * Mengambil komentar untuk sebuah artikel (baik dari Supabase maupun LocalStorage)
  */
 export async function getCommentsForSlug(slug: string): Promise<NewsComment[]> {
@@ -84,6 +150,7 @@ export async function getCommentsForSlug(slug: string): Promise<NewsComment[]> {
                 text: c.text,
                 status: c.status || "Menunggu Verifikasi",
                 createdAt: c.created_at,
+                upvotes: getCommentUpvoteCount(c.id),
             }));
 
             // Selaraskan ke LocalStorage agar cache lokal selalu bersih mengikuti database Supabase
@@ -100,14 +167,24 @@ export async function getCommentsForSlug(slug: string): Promise<NewsComment[]> {
         const saved = localStorage.getItem(`comments_${slug}`);
         if (saved) {
             try {
-                return JSON.parse(saved);
+                const list = JSON.parse(saved);
+                if (Array.isArray(list)) {
+                    return list.map((c) => ({
+                        ...c,
+                        upvotes: getCommentUpvoteCount(c.id)
+                    }));
+                }
             } catch {}
         }
     }
 
     // 3. Fallback ke newsDatabase mock
     const defaultNews = newsDatabase.find((n) => n.slug === slug);
-    return defaultNews?.commentsList || [];
+    const list = defaultNews?.commentsList || [];
+    return list.map((c) => ({
+        ...c,
+        upvotes: getCommentUpvoteCount(c.id)
+    }));
 }
 
 export const BLOCKED_KEYWORDS_LIST = [

@@ -24,6 +24,33 @@ function generateSlug(title: string): string {
         .slice(0, 80);
 }
 
+// Helper cerdas penentuan kategori kebijakan publik
+function classifyPolicyCategory(title: string, desc: string = "", preferred?: string): string {
+    if (preferred && preferred !== "Tata Kelola & Transparansi" && preferred !== "Kebijakan Publik") {
+        return preferred;
+    }
+    const combined = `${title} ${desc}`.toLowerCase();
+    
+    // 1. Energi & Lingkungan
+    if (combined.match(/energi|lingkungan|iklim|abrasi|pesisir|sampah|polusi|hutan|emisi|plts|surya|batu bara|tambang|bencana|banjir|konservasi|hijau|esdm|pln|bbm|pertamina/)) {
+        return "Energi & Lingkungan";
+    }
+    // 2. Ketahanan Pangan & Pertanian
+    if (combined.match(/pangan|beras|tani|pupuk|panen|pasar|ternak|sembako|konsumsi|harga|bulog|pertanian|perikanan|nelayan|devisa|inflasi|subsidi pangan|kebun|hortikultura/)) {
+        return "Ketahanan Pangan";
+    }
+    // 3. Pendidikan & Talenta
+    if (combined.match(/pendidikan|sekolah|guru|siswa|kuliah|mahasiswa|kampus|talenta|vokasi|kurikulum|akademik|pemuda|pahlawan|pelajar|beasiswa|riset|sdm/)) {
+        return "Pendidikan & Talenta";
+    }
+    // 4. Infrastruktur Publik & Transportasi
+    if (combined.match(/jalan|tol|jembatan|stasiun|kereta|bus|transit|pelabuhan|bandara|konstruksi|proyek|gedung|infrastruktur|kendaraan|mobil|motor|moda|transportasi|lrt|mrt|kcic|jalur/)) {
+        return "Infrastruktur Publik";
+    }
+    // 5. Tata Kelola Publik (Pemerintahan, Regulasi, Anggaran)
+    return "Tata Kelola Publik";
+}
+
 export async function POST(req: Request) {
     try {
         let body: any = {};
@@ -73,7 +100,8 @@ export async function POST(req: Request) {
 
         // Tentukan metadata artikel
         const topicTitle = selectedLiveItem?.title || topic || selectedDataset?.title || "Evaluasi Transparansi Kebijakan Publik Nasional";
-        const topicCategory = customCategory || selectedDataset?.category || (selectedLiveItem ? "Tata Kelola & Transparansi" : "Kebijakan Publik");
+        const initialSourceCategory = selectedLiveItem?.category || (selectedDataset ? selectedDataset.category : undefined);
+        const topicCategory = customCategory || classifyPolicyCategory(topicTitle, selectedLiveItem?.description, initialSourceCategory);
         const topicSource = selectedLiveItem ? selectedLiveItem.sourceName : (customSource || selectedDataset?.source || "Redaksi Riset MelekIsu");
         const datasetOrigin = selectedLiveItem ? `Live API Feed (${selectedLiveItem.sourceName})` : (selectedDataset?.datasetOrigin || "Portal Data Terbuka");
         
@@ -119,13 +147,18 @@ Kaidah Penulisan MelekIsu:
    - Paragraf 3: Dampak nyata bagi kesejahteraan masyarakat, pelayanan publik, atau perekonomian rakyat.
    - Paragraf 4: Poin refleksi pentingnya pengawasan partisipatif warga untuk memastikan keterbukaan informasi.
    - Gunakan gaya bahasa Indonesia yang lugas, baku, dan inspiratif.
-4. KATEGORI & SUMBER: Tetap sebutkan instansi atau media rujukan resminya (${topicSource}).
+4. KATEGORI: Wajib tentukan SATU kategori yang PALING TEPAT dan RELEVAN dari 5 kategori resmi MelekIsu berikut:
+   - "Infrastruktur Publik" (transportasi, jalan, jembatan, tol, stasiun, fasilitas fisik, mobilitas publik)
+   - "Ketahanan Pangan" (pertanian, sembako, beras, pupuk, perikanan, ekonomi pasar, subsidi pangan)
+   - "Pendidikan & Talenta" (sekolah, kurikulum, guru, beasiswa, kampus, universitas, talenta, riset)
+   - "Tata Kelola Publik" (regulasi, tata kelola, transparansi, hukum, birokrasi, pemda, anggaran daerah/nasional)
+   - "Energi & Lingkungan" (transisi energi, iklim, abrasi, polusi, emisi, plts, hutan, konservasi)
 5. FORMAT OUTPUT: Wajib HANYA berupa JSON murni tanpa pembungkus markdown (tanpa \`\`\`json).
 
 Format JSON yang wajib dihasilkan:
 {
   "title": "Judul berita lengkap dan profesional",
-  "category": "${topicCategory}",
+  "category": "Pilih salah satu dari 5 kategori resmi di atas",
   "source": "${topicSource}",
   "excerpt": "Ringkasan tajam 1-2 kalimat.",
   "content": "Isi lengkap artikel kebijakan dalam 3-4 paragraf yang terhubung rapi.",
@@ -183,15 +216,27 @@ Buatkan artikel lengkap siap terbit ke portal publik MelekIsu.`;
                         const finalTitle = parsed.title.trim();
                         const baseSlug = generateSlug(finalTitle);
 
+                        const standardCategories = [
+                            "Infrastruktur Publik",
+                            "Ketahanan Pangan",
+                            "Pendidikan & Talenta",
+                            "Tata Kelola Publik",
+                            "Energi & Lingkungan"
+                        ];
+                        const rawCat = (parsed.category || topicCategory || "").trim();
+                        const matchedCat = standardCategories.find(c => c.toLowerCase() === rawCat.toLowerCase());
+                        const resolvedCategory = matchedCat || classifyPolicyCategory(finalTitle, parsed.excerpt || parsed.content, topicCategory);
+                        const resolvedImage = selectedLiveItem?.imageUrl || getCategoryCoverImage(resolvedCategory);
+
                         generatedArticle = {
                             title: finalTitle,
                             slug: baseSlug,
-                            category: parsed.category || topicCategory,
+                            category: resolvedCategory,
                             source: parsed.source || topicSource,
                             excerpt: parsed.excerpt || parsed.content.slice(0, 160) + "...",
                             content: parsed.content,
                             duration: parsed.duration || "4 Menit Baca",
-                            image: initialCoverImage,
+                            image: resolvedImage,
                             date: currentDateStr,
                             likes: 0
                         };
@@ -207,17 +252,19 @@ Buatkan artikel lengkap siap terbit ke portal publik MelekIsu.`;
         if (!generatedArticle) {
             const fallbackTitle = topicTitle;
             const fallbackSlug = generateSlug(fallbackTitle);
+            const fallbackCategory = classifyPolicyCategory(fallbackTitle, selectedLiveItem?.description || "", topicCategory);
+            const fallbackImage = selectedLiveItem?.imageUrl || getCategoryCoverImage(fallbackCategory);
             const fallbackContent = `Pemerintah bersama ${topicSource} terus memperkuat keterbukaan dan efektivitas implementasi kebijakan ${topicTitle}. Langkah ini menjadi bagian penting dalam memastikan pelayanan publik dapat diakses secara merata oleh masyarakat.\n\nBerdasarkan data dan rilis pemantauan berkala, sinergi antarsektor serta transparansi pengawasan digital terus ditingkatkan. Keterlibatan masyarakat melalui pemberian aspirasi, masukan solutif, serta pemantauan independen dinilai menjadi fondasi utama dalam menjaga akuntabilitas setiap kebijakan publik.\n\nMelalui publikasi berkala pada platform MelekIsu, warga diimbau untuk terus mengawal pelaksanaan program ini secara kritis dan konstruktif.`;
 
             generatedArticle = {
                 title: fallbackTitle,
                 slug: fallbackSlug,
-                category: topicCategory,
+                category: fallbackCategory,
                 source: topicSource,
                 excerpt: selectedLiveItem?.description || `Laporan perkembangan terbaru kebijakan ${topicTitle} bersama ${topicSource} untuk meningkatkan transparansi publik.`,
                 content: fallbackContent,
                 duration: "3 Menit Baca",
-                image: initialCoverImage,
+                image: fallbackImage,
                 date: currentDateStr,
                 likes: 0
             };

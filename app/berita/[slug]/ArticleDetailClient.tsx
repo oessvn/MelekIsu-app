@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, MessageSquare, ThumbsUp, Send, AlertCircle, Building2, Calendar, Clock, CheckCircle2, HelpCircle, FileText, Bot, Sparkles } from "lucide-react";
-import { getCombinedNews, getCommentsForSlug, sendComment, isTextViolating } from "@/lib/newsService";
+import { getCombinedNews, getCommentsForSlug, sendComment, isTextViolating, toggleCommentUpvote, getCommentUpvoteCount, isCommentUpvotedByUser } from "@/lib/newsService";
 import { NewsItem, NewsComment } from "@/data/news";
 import { createClient } from "@/lib/supabase/client";
 
@@ -22,12 +22,55 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
     // State untuk Modal Kustom & Moderasi AI
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [userAlert, setUserAlert] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        type: "info" | "error" | "success";
+    }>({
+        isOpen: false,
+        title: "",
+        message: "",
+        type: "info"
+    });
+    const [commentUpvoteMap, setCommentUpvoteMap] = useState<{
+        [commentId: string]: { count: number; isUpvoted: boolean };
+    }>({});
     const [moderationFeedback, setModerationFeedback] = useState<{
         approved: boolean;
         status: string;
         reason: string;
         sentiment?: string;
     } | null>(null);
+
+    const handleToggleCommentUpvote = async (commentId: string) => {
+        if (!currentUser) {
+            setUserAlert({
+                isOpen: true,
+                title: "Akses Masuk Diperlukan",
+                message: "Silakan Masuk terlebih dahulu untuk memberikan apresiasi pada tanggapan warga.",
+                type: "info"
+            });
+            return;
+        }
+        const userKey = currentUser.emailOrPhone || currentUser.id || "user";
+        const result = await toggleCommentUpvote(commentId, userKey);
+        setCommentUpvoteMap((prev) => ({
+            ...prev,
+            [commentId]: result
+        }));
+    };
+
+    const getUpvoteCount = (commentId: string) => {
+        if (commentUpvoteMap[commentId]) return commentUpvoteMap[commentId].count;
+        return getCommentUpvoteCount(commentId);
+    };
+
+    const isUpvoted = (commentId: string) => {
+        if (commentUpvoteMap[commentId]) return commentUpvoteMap[commentId].isUpvoted;
+        const userKey = currentUser ? (currentUser.emailOrPhone || currentUser.id) : "";
+        return isCommentUpvotedByUser(commentId, userKey);
+    };
 
     // 1. Ambil data artikel
     useEffect(() => {
@@ -426,6 +469,27 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
                                         <p className="text-xs sm:text-sm text-[#574238] leading-relaxed">
                                             {c.text}
                                         </p>
+
+                                        {/* Baris Bawah: Tanggal & Tombol Upvote / Apresiasi */}
+                                        <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-[#DEC0B3]/25">
+                                            <span className="text-[11px] text-[#8B7266]">
+                                                {c.createdAt ? new Date(c.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "Warga MelekIsu"}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleToggleCommentUpvote(c.id)}
+                                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                                                    isUpvoted(c.id)
+                                                        ? "bg-[#FFE3D1] text-[#9B4000] border border-[#DEC0B3] shadow-xs"
+                                                        : "bg-white text-[#8B7266] border border-[#DEC0B3]/50 hover:bg-[#FFE3D1]/40 hover:text-[#9B4000]"
+                                                }`}
+                                                title="Apresiasi tanggapan warga yang berbobot dan solutif"
+                                            >
+                                                <ThumbsUp className={`w-3.5 h-3.5 ${isUpvoted(c.id) ? "fill-[#9B4000] text-[#9B4000]" : ""}`} />
+                                                <span>{getUpvoteCount(c.id)}</span>
+                                                <span className="hidden sm:inline font-semibold text-[11px]">Apresiasi</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 );
                             })
@@ -595,6 +659,39 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
                                 </button>
                             </>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Notifikasi / Peringatan Pengguna */}
+            {userAlert.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-[#DEC0B3]/40 flex flex-col items-center text-center gap-4">
+                        <div className={`w-14 h-14 rounded-full flex items-center justify-center shadow-inner ${
+                            userAlert.type === "error"
+                                ? "bg-rose-50 text-rose-600 border border-rose-200"
+                                : userAlert.type === "success"
+                                ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                        }`}>
+                            {userAlert.type === "error" ? (
+                                <AlertCircle className="w-8 h-8" />
+                            ) : userAlert.type === "success" ? (
+                                <CheckCircle2 className="w-8 h-8" />
+                            ) : (
+                                <AlertCircle className="w-8 h-8" />
+                            )}
+                        </div>
+                        <div className="space-y-1.5">
+                            <h3 className="text-lg font-extrabold text-[#28180C]">{userAlert.title}</h3>
+                            <p className="text-xs text-[#574238] leading-relaxed">{userAlert.message}</p>
+                        </div>
+                        <button
+                            onClick={() => setUserAlert((prev) => ({ ...prev, isOpen: false }))}
+                            className="w-full mt-1 py-2.5 px-4 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                        >
+                            Mengerti
+                        </button>
                     </div>
                 </div>
             )}

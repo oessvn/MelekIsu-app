@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { MessageSquare, ThumbsUp, ArrowRight, Send, AlertCircle, Search, FileText, CheckCircle2, Bot, Sparkles, ArrowUpDown } from "lucide-react";
-import { getCombinedNews, sendComment, getCommentsForSlug, isTextViolating } from "@/lib/newsService";
+import { getCombinedNews, sendComment, getCommentsForSlug, isTextViolating, toggleCommentUpvote, getCommentUpvoteCount, isCommentUpvotedByUser } from "@/lib/newsService";
 import { NewsItem } from "@/data/news";
 import { createClient } from "@/lib/supabase/client";
 
@@ -88,6 +88,39 @@ function BeritaContent() {
         reason: string;
         sentiment?: string;
     } | null>(null);
+
+    const [commentUpvoteMap, setCommentUpvoteMap] = useState<{
+        [commentId: string]: { count: number; isUpvoted: boolean };
+    }>({});
+
+    const handleToggleCommentUpvote = async (commentId: string) => {
+        if (!currentUser) {
+            setUserAlert({
+                isOpen: true,
+                title: "Akses Masuk Diperlukan",
+                message: "Silakan Masuk terlebih dahulu untuk memberikan apresiasi pada komentar warga.",
+                type: "info"
+            });
+            return;
+        }
+        const userKey = currentUser.emailOrPhone || currentUser.id || "user";
+        const result = await toggleCommentUpvote(commentId, userKey);
+        setCommentUpvoteMap((prev) => ({
+            ...prev,
+            [commentId]: result
+        }));
+    };
+
+    const getCommentUpvotes = (commentId: string) => {
+        if (commentUpvoteMap[commentId]) return commentUpvoteMap[commentId].count;
+        return getCommentUpvoteCount(commentId);
+    };
+
+    const isCommentUpvoted = (commentId: string) => {
+        if (commentUpvoteMap[commentId]) return commentUpvoteMap[commentId].isUpvoted;
+        const userKey = currentUser ? (currentUser.emailOrPhone || currentUser.id) : "";
+        return isCommentUpvotedByUser(commentId, userKey);
+    };
 
     // Sinkronisasi data berita dinamis & user
     useEffect(() => {
@@ -488,7 +521,23 @@ function BeritaContent() {
                                                                             </span>
                                                                         )}
                                                                     </div>
-                                                                    <span className="text-[#28180C]">{c.text}</span>
+                                                                    <span className="text-[#28180C] block mb-1.5 leading-relaxed">{c.text}</span>
+                                                                    <div className="flex items-center justify-end pt-1 border-t border-[#DEC0B3]/20">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleToggleCommentUpvote(c.id)}
+                                                                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
+                                                                                isCommentUpvoted(c.id)
+                                                                                    ? "bg-[#FFE3D1] text-[#9B4000] border border-[#DEC0B3] shadow-xs"
+                                                                                    : "bg-white text-[#8B7266] border border-[#DEC0B3]/40 hover:bg-[#FFE3D1]/40 hover:text-[#9B4000]"
+                                                                            }`}
+                                                                            title="Apresiasi masukan ini"
+                                                                        >
+                                                                            <ThumbsUp className={`w-3 h-3 ${isCommentUpvoted(c.id) ? "fill-[#9B4000] text-[#9B4000]" : ""}`} />
+                                                                            <span>{getCommentUpvotes(c.id)}</span>
+                                                                            <span className="font-normal text-[9px]">Apresiasi</span>
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             );
                                                         })

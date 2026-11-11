@@ -14,13 +14,14 @@ export interface LiveExternalNewsItem {
     pubDate: string;
     imageUrl?: string;
     sourceName: string;
+    category?: string;
 }
 
 export const EXTERNAL_NEWS_SOURCES: ExternalNewsSource[] = [
     {
         id: "antara-politik",
         name: "Antara News (Politik & Kebijakan)",
-        category: "Tata Kelola & Transparansi",
+        category: "Tata Kelola Publik",
         feedUrl: "https://www.antaranews.com/rss/politik.xml",
         description: "Kantor Berita Nasional resmi Indonesia, pembaruan kebijakan dan tata kelola pemerintah.",
         badgeColor: "bg-red-100 text-red-800 border-red-200"
@@ -107,7 +108,8 @@ export async function fetchExternalLiveNews(sourceId?: string, limit: number = 6
                     description,
                     pubDate: rawPubDate ? new Date(rawPubDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Terbaru",
                     imageUrl: rawImg ? cleanXmlText(rawImg) : undefined,
-                    sourceName: source.name
+                    sourceName: source.name,
+                    category: source.category
                 });
             }
         }
