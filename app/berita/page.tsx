@@ -3,16 +3,36 @@
 import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { MessageSquare, ThumbsUp, ArrowRight, Send, AlertCircle, Search, FileText, CheckCircle2, Bot, Sparkles } from "lucide-react";
+import { MessageSquare, ThumbsUp, ArrowRight, Send, AlertCircle, Search, FileText, CheckCircle2, Bot, Sparkles, ArrowUpDown } from "lucide-react";
 import { getCombinedNews, sendComment, getCommentsForSlug, isTextViolating } from "@/lib/newsService";
 import { NewsItem } from "@/data/news";
 import { createClient } from "@/lib/supabase/client";
+
+function matchCategory(itemCategory: string, selected: string): boolean {
+    if (selected === "Semua") return true;
+    if (!itemCategory) return false;
+    const cat = itemCategory.toLowerCase().trim();
+    const sel = selected.toLowerCase().trim();
+    if (cat === sel) return true;
+    if (sel.includes("infrastruktur") && cat.includes("infrastruktur")) return true;
+    if (sel.includes("pangan") && cat.includes("pangan")) return true;
+    if ((sel.includes("pendidikan") || sel.includes("talenta") || sel.includes("sdm")) && 
+        (cat.includes("pendidikan") || cat.includes("talenta") || cat.includes("sdm"))) return true;
+    if ((sel.includes("tata kelola") || sel.includes("transparansi")) && 
+        (cat.includes("tata kelola") || cat.includes("transparansi"))) return true;
+    if ((sel.includes("energi") || sel.includes("lingkungan")) && 
+        (cat.includes("energi") || cat.includes("lingkungan"))) return true;
+    if ((sel.includes("digital") || sel.includes("teknologi")) && 
+        (cat.includes("digital") || cat.includes("teknologi"))) return true;
+    return cat.includes(sel) || sel.includes(cat);
+}
 
 function BeritaContent() {
     const searchParams = useSearchParams();
     const searchQuery = searchParams.get("search") || "";
 
     const [selectedCategory, setSelectedCategory] = useState("Semua");
+    const [sortBy, setSortBy] = useState<"terbaru" | "populer" | "diskusi">("terbaru");
     const [newsData, setNewsData] = useState<NewsItem[]>([]);
     const [activeCommentBox, setActiveCommentBox] = useState<string | null>(null);
     const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>({});
@@ -74,10 +94,26 @@ function BeritaContent() {
         return () => window.removeEventListener("storage", syncData);
     }, [searchQuery]);
 
+    const availableCategories = useMemo(() => {
+        const base = [
+            "Semua",
+            "Infrastruktur Publik",
+            "Ketahanan Pangan",
+            "Pendidikan & Talenta",
+            "Tata Kelola & Transparansi",
+            "Energi & Lingkungan"
+        ];
+        newsData.forEach((item) => {
+            if (item.category && !base.some((b) => matchCategory(item.category, b))) {
+                base.push(item.category);
+            }
+        });
+        return base;
+    }, [newsData]);
+
     const filteredNews = useMemo(() => {
-        return newsData.filter((item) => {
-            const matchesCategory =
-                selectedCategory === "Semua" || item.category === selectedCategory;
+        const filtered = newsData.filter((item) => {
+            const matchesCategory = matchCategory(item.category, selectedCategory);
 
             const matchesSearch =
                 item.title.toLowerCase().includes(keyword.toLowerCase()) ||
@@ -87,7 +123,17 @@ function BeritaContent() {
 
             return matchesCategory && matchesSearch;
         });
-    }, [newsData, selectedCategory, keyword]);
+
+        return filtered.sort((a, b) => {
+            if (sortBy === "populer") {
+                return (b.likes || 0) - (a.likes || 0);
+            }
+            if (sortBy === "diskusi") {
+                return (b.commentsList?.length || 0) - (a.commentsList?.length || 0);
+            }
+            return 0; // Default: urutan kronologis terbaru
+        });
+    }, [newsData, selectedCategory, keyword, sortBy]);
 
     const handleToggleLike = async (id: string) => {
         const userKey = currentUser?.emailOrPhone || currentUser?.id || "guest";
@@ -228,7 +274,7 @@ function BeritaContent() {
             <section className="sticky top-20 z-40 bg-[#FFF8F5]/90 backdrop-blur-md border-b border-[#DEC0B3]/30 shadow-sm">
                 <div className="max-w-[1360px] mx-auto px-6 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-2 overflow-x-auto w-full pb-1 md:pb-0 scrollbar-none">
-                        {["Semua", "Infrastruktur Publik", "Ketahanan Pangan", "Pendidikan & Talenta", "Tata Kelola Publik"].map((cat) => (
+                        {availableCategories.map((cat) => (
                             <button
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
@@ -260,7 +306,22 @@ function BeritaContent() {
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* Selector Pengurutan (Sorting) */}
+                        <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-2xl border border-[#DEC0B3]/60 text-xs shadow-xs">
+                            <ArrowUpDown className="w-3.5 h-3.5 text-[#9B4000]" />
+                            <span className="text-[11px] font-bold text-[#8B7266]">Urutkan:</span>
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value as any)}
+                                className="bg-transparent font-extrabold text-[#28180C] focus:outline-none cursor-pointer"
+                            >
+                                <option value="terbaru">Terbaru</option>
+                                <option value="populer">Paling Banyak Diapresiasi</option>
+                                <option value="diskusi">Paling Banyak Tanggapan</option>
+                            </select>
+                        </div>
+
                         <span className="text-xs font-bold text-[#8B7266]">
                             Menampilkan <strong className="text-[#9B4000]">{filteredNews.length}</strong> artikel
                         </span>

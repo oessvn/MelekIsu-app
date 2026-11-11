@@ -83,6 +83,35 @@ export default function AdminDashboardPage() {
         }
     };
 
+    // State Modal Notifikasi Kustom Admin (Identik dengan Modal Pengguna)
+    const [adminAlert, setAdminAlert] = useState<{
+        isOpen: boolean;
+        type: "success" | "error" | "info";
+        title: string;
+        message: string;
+        detail?: string;
+    }>({
+        isOpen: false,
+        type: "success",
+        title: "",
+        message: "",
+    });
+
+    const showAlert = (
+        title: string,
+        message: string,
+        type: "success" | "error" | "info" = "success",
+        detail?: string
+    ) => {
+        setAdminAlert({
+            isOpen: true,
+            type,
+            title,
+            message,
+            detail,
+        });
+    };
+
     useEffect(() => {
         if (showAutoNewsModal && autoNewsSourceMode === "live_api") {
             loadLiveFeed(selectedLiveSourceId);
@@ -188,7 +217,7 @@ export default function AdminDashboardPage() {
                 .eq("id", commentId);
 
             if (error) {
-                alert("Gagal memverifikasi komentar di Supabase: " + error.message);
+                showAlert("Gagal Verifikasi", "Tidak dapat memverifikasi komentar di Supabase: " + error.message, "error");
                 return;
             }
         }
@@ -208,6 +237,7 @@ export default function AdminDashboardPage() {
         }
 
         loadData();
+        showAlert("Komentar Disetujui", "Tanggapan warga berhasil diverifikasi dan kini tayang ke publik.", "success");
     };
 
     // Handler Hapus Komentar
@@ -221,7 +251,7 @@ export default function AdminDashboardPage() {
                 .eq("id", commentId);
 
             if (error) {
-                alert("Gagal menghapus komentar dari Supabase: " + error.message);
+                showAlert("Gagal Menghapus", "Tidak dapat menghapus komentar dari Supabase: " + error.message, "error");
                 return;
             }
         }
@@ -241,6 +271,7 @@ export default function AdminDashboardPage() {
         }
 
         loadData();
+        showAlert("Komentar Dihapus", "Masukan warga telah dihapus secara permanen dari sistem.", "info");
     };
 
     // Handler pilih file gambar lokal
@@ -249,7 +280,7 @@ export default function AdminDashboardPage() {
         if (file) {
             // Validasi ukuran maks 3MB
             if (file.size > 3 * 1024 * 1024) {
-                alert("Ukuran gambar maksimal 3MB.");
+                showAlert("Ukuran Terlalu Besar", "Ukuran file gambar maksimal 3MB. Silakan pilih gambar yang lebih kecil.", "error");
                 return;
             }
             const reader = new FileReader();
@@ -306,7 +337,7 @@ export default function AdminDashboardPage() {
                 .insert([newItem]);
 
             if (error) {
-                alert("Gagal menambahkan berita ke database Supabase: " + error.message);
+                showAlert("Gagal Menerbitkan", "Tidak dapat menambahkan berita ke database Supabase: " + error.message, "error");
                 setIsSubmitting(false);
                 return;
             }
@@ -326,7 +357,7 @@ export default function AdminDashboardPage() {
         setShowAddModal(false);
         setIsSubmitting(false);
         loadData();
-        alert("Berita baru berhasil diterbitkan!");
+        showAlert("Berita Berhasil Diterbitkan!", "Artikel berita baru telah berhasil ditayangkan ke portal publik MelekIsu.", "success", newItem.title);
     };
 
     // Handler AI: Publikasi Otomatis Instan (1-Klik)
@@ -358,16 +389,21 @@ export default function AdminDashboardPage() {
             const data = await res.json();
 
             if (data.success && data.news) {
-                alert(`Berhasil! Berita dari ${data.sourceName || "API"} otomatis diterbitkan:\n"${data.news.title}"`);
                 setShowAutoNewsModal(false);
                 setGeneratedDraft(null);
                 setCustomTopicInput("");
                 loadData();
+                showAlert(
+                    "Berita Otomatis Berhasil Terbit!",
+                    `Berita dari ${data.sourceName || "API"} telah diproses AI dan langsung terbit ke portal publik.`,
+                    "success",
+                    data.news.title
+                );
             } else {
-                alert("Gagal memproduksi berita otomatis: " + (data.message || "Unknown error"));
+                showAlert("Gagal Memproduksi Berita", data.message || "Terjadi kendala pada sistem AI.", "error");
             }
         } catch (err: any) {
-            alert("Kendala koneksi ke AI Auto-News: " + err.message);
+            showAlert("Kendala Koneksi AI", err.message, "error");
         } finally {
             setIsGeneratingAutoNews(false);
             setAutoNewsStepText("");
@@ -397,10 +433,10 @@ export default function AdminDashboardPage() {
             if (data.success && data.news) {
                 setGeneratedDraft(data.news);
             } else {
-                alert("Gagal memproduksi draf: " + (data.message || "Unknown error"));
+                showAlert("Gagal Membuat Draf", data.message || "Terjadi kendala saat menyusun draf.", "error");
             }
         } catch (err: any) {
-            alert("Kendala koneksi: " + err.message);
+            showAlert("Kendala Koneksi", err.message, "error");
         } finally {
             setIsGeneratingAutoNews(false);
             setAutoNewsStepText("");
@@ -423,13 +459,14 @@ export default function AdminDashboardPage() {
                 localStorage.setItem("melekisu_custom_news", JSON.stringify([{ ...generatedDraft, id: `n-${Date.now()}` }, ...customList]));
             }
 
-            alert(`Berita "${generatedDraft.title}" berhasil diterbitkan ke portal!`);
             setShowAutoNewsModal(false);
+            const draftTitle = generatedDraft.title;
             setGeneratedDraft(null);
             setCustomTopicInput("");
             loadData();
+            showAlert("Draf Berhasil Diterbitkan!", "Artikel draf telah berhasil diunggah ke database dan siap dibaca warga.", "success", draftTitle);
         } catch (err: any) {
-            alert("Gagal menerbitkan draf: " + err.message);
+            showAlert("Gagal Menerbitkan Draf", err.message, "error");
         } finally {
             setIsGeneratingAutoNews(false);
             setAutoNewsStepText("");
@@ -439,7 +476,7 @@ export default function AdminDashboardPage() {
     // Handler AI: Bantu Tulis Cepat di Form Tambah Berita Manual
     const handleAIAssistManualForm = async () => {
         if (!newTitle.trim()) {
-            alert("Ketikkan topik atau judul ringkas terlebih dahulu di kolom Judul.");
+            showAlert("Judul Belum Diisi", "Ketikkan topik atau judul ringkas terlebih dahulu di kolom Judul agar AI dapat menyusun kontennya.", "info");
             return;
         }
 
@@ -468,10 +505,10 @@ export default function AdminDashboardPage() {
                     setImagePreview(data.news.image);
                 }
             } else {
-                alert("Gagal auto-generate konten: " + (data.message || "Unknown error"));
+                showAlert("Gagal Auto-Generate", data.message || "Unknown error", "error");
             }
         } catch (err: any) {
-            alert("Kendala koneksi ke AI: " + err.message);
+            showAlert("Kendala Koneksi AI", err.message, "error");
         } finally {
             setIsAIAssisting(false);
         }
@@ -1307,6 +1344,59 @@ export default function AdminDashboardPage() {
                                 Endpoint API <code className="px-1.5 py-0.5 rounded bg-white border border-[#DEC0B3] font-mono text-[#9B4000]">POST /api/auto-news</code> atau <code className="px-1.5 py-0.5 rounded bg-white border border-[#DEC0B3] font-mono text-[#9B4000]">GET /api/auto-news</code> dapat dihubungkan ke CRON harian (misal: Vercel Cron atau GitHub Actions) untuk memproduksi dan mengunggah berita otomatis setiap pagi secara berkala.
                             </p>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Notifikasi Kustom Admin (Identik dengan Modal Pengguna) */}
+            {adminAlert.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-[#DEC0B3]/40 flex flex-col items-center text-center gap-5">
+                        {adminAlert.type === "success" ? (
+                            <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner border border-emerald-100">
+                                <CheckCircle2 className="w-9 h-9 text-emerald-600" />
+                            </div>
+                        ) : adminAlert.type === "error" ? (
+                            <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner border border-rose-100">
+                                <AlertCircle className="w-9 h-9 text-rose-600" />
+                            </div>
+                        ) : (
+                            <div className="w-16 h-16 rounded-full bg-amber-50 text-[#9B4000] flex items-center justify-center shadow-inner border border-amber-100">
+                                <Sparkles className="w-9 h-9 text-[#9B4000]" />
+                            </div>
+                        )}
+
+                        <div className="space-y-2 w-full">
+                            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold border ${
+                                adminAlert.type === "success" 
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                                    : adminAlert.type === "error"
+                                    ? "bg-rose-50 text-rose-700 border-rose-200"
+                                    : "bg-amber-50 text-amber-700 border-amber-200"
+                            }`}>
+                                <Bot className="w-3.5 h-3.5" />
+                                <span>
+                                    {adminAlert.type === "success" ? "Operasi Redaksi Berhasil" : adminAlert.type === "error" ? "Pemberitahuan Sistem" : "Informasi Redaksi"}
+                                </span>
+                            </span>
+                            <h3 className="text-xl font-extrabold text-[#28180C]">{adminAlert.title}</h3>
+                            <p className="text-xs sm:text-sm text-[#574238] leading-relaxed">
+                                {adminAlert.message}
+                            </p>
+                            {adminAlert.detail && (
+                                <div className="mt-2 p-3 bg-[#FFF8F5] rounded-xl border border-[#DEC0B3]/40 text-left text-xs text-[#574238] font-medium break-words">
+                                    <strong className="text-[#9B4000] block mb-0.5">Rincian:</strong>
+                                    <span>{adminAlert.detail}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <button
+                            onClick={() => setAdminAlert((prev) => ({ ...prev, isOpen: false }))}
+                            className="w-full mt-2 py-3 px-5 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                        >
+                            Mengerti & Tutup
+                        </button>
                     </div>
                 </div>
             )}
