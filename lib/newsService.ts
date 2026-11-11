@@ -29,6 +29,7 @@ export async function getCombinedNews(): Promise<NewsItem[]> {
                 duration: item.duration || "5 Menit Baca",
                 likes: item.likes || 0,
                 image: item.image || "/images/infrastruktur.jpg",
+                createdAt: item.created_at,
                 commentsList: [],
             }));
             return list;

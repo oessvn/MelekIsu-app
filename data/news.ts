@@ -20,6 +20,7 @@ export interface NewsItem {
     duration: string;
     likes: number;
     image?: string;
+    createdAt?: string;
     commentsList: NewsComment[];
 }
 export const newsDatabase: NewsItem[] = [

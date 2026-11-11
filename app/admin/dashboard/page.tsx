@@ -97,6 +97,13 @@ export default function AdminDashboardPage() {
         message: "",
     });
 
+    const [deleteConfirm, setDeleteConfirm] = useState<{
+        isOpen: boolean;
+        commentId: string;
+        slug: string;
+        author: string;
+    } | null>(null);
+
     const showAlert = (
         title: string,
         message: string,
@@ -240,9 +247,21 @@ export default function AdminDashboardPage() {
         showAlert("Komentar Disetujui", "Tanggapan warga berhasil diverifikasi dan kini tayang ke publik.", "success");
     };
 
-    // Handler Hapus Komentar
-    const handleDeleteComment = async (commentId: string, slug: string) => {
-        if (!confirm("Hapus masukan warga ini secara permanen?")) return;
+    // Handler Membuka Modal Konfirmasi Hapus Komentar
+    const requestDeleteComment = (commentId: string, slug: string, author: string) => {
+        setDeleteConfirm({
+            isOpen: true,
+            commentId,
+            slug,
+            author,
+        });
+    };
+
+    // Handler Eksekusi Hapus Komentar setelah konfirmasi modal
+    const executeDeleteComment = async () => {
+        if (!deleteConfirm) return;
+        const { commentId, slug } = deleteConfirm;
+        setDeleteConfirm(null);
 
         if (isDbConnected) {
             const { error } = await supabase
@@ -699,7 +718,7 @@ export default function AdminDashboardPage() {
                                             </button>
                                         )}
                                         <button
-                                            onClick={() => handleDeleteComment(item.id, item.slug)}
+                                            onClick={() => requestDeleteComment(item.id, item.slug, item.author)}
                                             className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
@@ -1397,6 +1416,41 @@ export default function AdminDashboardPage() {
                         >
                             Mengerti & Tutup
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Dialog Konfirmasi Hapus Komentar */}
+            {deleteConfirm && deleteConfirm.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-[#DEC0B3]/40 flex flex-col items-center text-center gap-4">
+                        <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner border border-rose-200">
+                            <Trash2 className="w-7 h-7 text-rose-600" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                <span>Tindakan Permanen</span>
+                            </span>
+                            <h3 className="text-lg font-extrabold text-[#28180C]">Hapus Tanggapan Warga?</h3>
+                            <p className="text-xs text-[#574238] leading-relaxed">
+                                Apakah Anda yakin ingin menghapus tanggapan dari <strong className="text-[#28180C]">{deleteConfirm.author || "Warga"}</strong>? Tindakan ini tidak dapat dibatalkan.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 w-full mt-2">
+                            <button
+                                onClick={() => setDeleteConfirm(null)}
+                                className="flex-1 py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-[#574238] text-xs font-bold rounded-xl transition-all cursor-pointer"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={executeDeleteComment}
+                                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                            >
+                                Ya, Hapus
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

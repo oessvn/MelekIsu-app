@@ -27,6 +27,33 @@ function matchCategory(itemCategory: string, selected: string): boolean {
     return cat.includes(sel) || sel.includes(cat);
 }
 
+function parseNewsTimestamp(item: NewsItem): number {
+    if ((item as any).createdAt) {
+        const time = new Date((item as any).createdAt).getTime();
+        if (!isNaN(time)) return time;
+    }
+    if (item.date) {
+        const str = item.date.trim();
+        const parts = str.split(/\s+/);
+        if (parts.length === 3) {
+            const day = parseInt(parts[0], 10);
+            const monthStr = parts[1].toLowerCase();
+            const year = parseInt(parts[2], 10);
+            const months: Record<string, number> = {
+                januari: 0, februari: 1, maret: 2, april: 3, mei: 4, juni: 5,
+                juli: 6, agustus: 7, september: 8, oktober: 9, november: 10, desember: 11
+            };
+            if (!isNaN(day) && !isNaN(year) && months[monthStr] !== undefined) {
+                return new Date(year, months[monthStr], day).getTime();
+            }
+        }
+        const time = new Date(str).getTime();
+        if (!isNaN(time)) return time;
+    }
+    const numId = parseInt(item.id, 10);
+    return !isNaN(numId) ? numId : 0;
+}
+
 function BeritaContent() {
     const searchParams = useSearchParams();
     const searchQuery = searchParams.get("search") || "";
@@ -44,6 +71,17 @@ function BeritaContent() {
     const [pendingSubmit, setPendingSubmit] = useState<{ articleId: string; text: string; articleSlug: string } | null>(null);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [userAlert, setUserAlert] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        type: "info" | "error" | "success";
+    }>({
+        isOpen: false,
+        title: "",
+        message: "",
+        type: "info",
+    });
     const [moderationFeedback, setModerationFeedback] = useState<{
         approved: boolean;
         status: string;
@@ -100,7 +138,7 @@ function BeritaContent() {
             "Infrastruktur Publik",
             "Ketahanan Pangan",
             "Pendidikan & Talenta",
-            "Tata Kelola & Transparansi",
+            "Tata Kelola Publik",
             "Energi & Lingkungan"
         ];
         newsData.forEach((item) => {
@@ -124,14 +162,19 @@ function BeritaContent() {
             return matchesCategory && matchesSearch;
         });
 
-        return filtered.sort((a, b) => {
+        return [...filtered].sort((a, b) => {
             if (sortBy === "populer") {
-                return (b.likes || 0) - (a.likes || 0);
+                const diff = (b.likes || 0) - (a.likes || 0);
+                if (diff !== 0) return diff;
             }
             if (sortBy === "diskusi") {
-                return (b.commentsList?.length || 0) - (a.commentsList?.length || 0);
+                const diff = (b.commentsList?.length || 0) - (a.commentsList?.length || 0);
+                if (diff !== 0) return diff;
             }
-            return 0; // Default: urutan kronologis terbaru
+            // Default "terbaru" atau tie-breaker untuk populer & diskusi
+            const timeDiff = parseNewsTimestamp(b) - parseNewsTimestamp(a);
+            if (timeDiff !== 0) return timeDiff;
+            return String(b.id || "").localeCompare(String(a.id || ""));
         });
     }, [newsData, selectedCategory, keyword, sortBy]);
 
@@ -187,7 +230,12 @@ function BeritaContent() {
         e.preventDefault();
 
         if (!currentUser) {
-            alert("Silakan Masuk atau Daftar terlebih dahulu untuk berpartisipasi dalam diskusi warga.");
+            setUserAlert({
+                isOpen: true,
+                title: "Akses Terbatas",
+                message: "Silakan Masuk atau Daftar terlebih dahulu untuk berpartisipasi dalam diskusi warga.",
+                type: "info",
+            });
             return;
         }
 
@@ -202,7 +250,12 @@ function BeritaContent() {
         );
 
         if (hasCommented) {
-            alert("Batas kuota tercapai: Anda sudah mengirimkan 1 komentar pada artikel ini.");
+            setUserAlert({
+                isOpen: true,
+                title: "Batas Kuota Tercapai",
+                message: "Anda sudah mengirimkan 1 komentar pada artikel ini. Tiap warga dibatasi 1 masukan per artikel agar ruang diskusi publik berimbang.",
+                type: "info",
+            });
             return;
         }
 
@@ -262,7 +315,12 @@ function BeritaContent() {
             setShowSuccessModal(true);
         } catch (err) {
             console.error("Gagal mengirim tanggapan:", err);
-            alert("Terjadi kendala saat mengirim tanggapan. Silakan coba kembali.");
+            setUserAlert({
+                isOpen: true,
+                title: "Kendala Pengiriman",
+                message: "Terjadi kendala saat mengirim tanggapan. Silakan coba kembali dalam beberapa saat.",
+                type: "error",
+            });
         } finally {
             setIsSubmitting(false);
         }
@@ -629,6 +687,39 @@ function BeritaContent() {
                                 </button>
                             </>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Dialog Kustom Notifikasi Pengguna */}
+            {userAlert.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-[#DEC0B3]/40 flex flex-col items-center text-center gap-4">
+                        <div className={`w-14 h-14 rounded-full flex items-center justify-center shadow-inner ${
+                            userAlert.type === "error"
+                                ? "bg-rose-50 text-rose-600 border border-rose-200"
+                                : userAlert.type === "success"
+                                ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                        }`}>
+                            {userAlert.type === "error" ? (
+                                <AlertCircle className="w-8 h-8" />
+                            ) : userAlert.type === "success" ? (
+                                <CheckCircle2 className="w-8 h-8" />
+                            ) : (
+                                <AlertCircle className="w-8 h-8" />
+                            )}
+                        </div>
+                        <div className="space-y-1.5">
+                            <h3 className="text-lg font-extrabold text-[#28180C]">{userAlert.title}</h3>
+                            <p className="text-xs text-[#574238] leading-relaxed">{userAlert.message}</p>
+                        </div>
+                        <button
+                            onClick={() => setUserAlert((prev) => ({ ...prev, isOpen: false }))}
+                            className="w-full mt-1 py-2.5 px-4 bg-[#9B4000] hover:bg-[#8C4A1E] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                        >
+                            Mengerti
+                        </button>
                     </div>
                 </div>
             )}
