@@ -279,7 +279,7 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
     const handleAskAI = (prompt: string) => {
         window.dispatchEvent(
             new CustomEvent("open-ai-chat", {
-                detail: { prompt, slug: articleData?.slug },
+                detail: { prompt, slug: articleData?.slug, article: articleData },
             })
         );
     };
@@ -357,18 +357,30 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
                             Diterbitkan oleh <strong className="text-[#28180C]">{articleData.source}</strong> untuk transparansi publik.
                         </span>
 
-                        {/* Tombol Suka / Like */}
-                        <button
-                            onClick={handleToggleLike}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                isLiked
-                                    ? "bg-[#FFE3D1] text-[#9B4000] border border-[#9B4000]/40 shadow-xs"
-                                    : "bg-[#FFF8F5] text-[#574238] border border-[#DEC0B3]/60 hover:bg-[#FFE3D1]"
-                            }`}
-                        >
-                            <ThumbsUp className={`w-4 h-4 ${isLiked ? "fill-[#9B4000] text-[#9B4000]" : ""}`} />
-                            <span>{likes} Apresiasi Warga</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {/* Tombol Tanya AI Cepat */}
+                            <button
+                                onClick={() => handleAskAI(`Tolong jelaskan analisis isu utama dan dampak kebijakan dari artikel "${articleData.title}"`)}
+                                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#FFF1E9] text-[#9B4000] border border-[#DEC0B3]/70 hover:bg-[#FFDDC9] transition-all cursor-pointer shadow-xs active:scale-95"
+                                title="Tanya AI tentang artikel ini"
+                            >
+                                <Sparkles className="w-3.5 h-3.5 text-[#9B4000]" />
+                                <span>Tanya AI</span>
+                            </button>
+
+                            {/* Tombol Suka / Like */}
+                            <button
+                                onClick={handleToggleLike}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                    isLiked
+                                        ? "bg-[#FFE3D1] text-[#9B4000] border border-[#9B4000]/40 shadow-xs"
+                                        : "bg-[#FFF8F5] text-[#574238] border border-[#DEC0B3]/60 hover:bg-[#FFE3D1]"
+                                }`}
+                            >
+                                <ThumbsUp className={`w-4 h-4 ${isLiked ? "fill-[#9B4000] text-[#9B4000]" : ""}`} />
+                                <span>{likes} Apresiasi Warga</span>
+                            </button>
+                        </div>
                     </div>
                 </article>
 

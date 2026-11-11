@@ -105,7 +105,7 @@ export async function toggleCommentUpvote(
     try {
         const storageKey = `comment_upvotes_${commentId}`;
         const stored = localStorage.getItem(storageKey);
-        let parsed = stored ? JSON.parse(stored) : { count: 0, users: [] };
+        const parsed = stored ? JSON.parse(stored) : { count: 0, users: [] };
         let users: string[] = Array.isArray(parsed.users) ? parsed.users : [];
         let count: number = typeof parsed.count === "number" ? parsed.count : users.length;
 

@@ -519,13 +519,35 @@ export default function HomePage() {
                   </button>
                 </div>
 
-                <Link
-                  href={`/berita/${featuredNews.slug}`}
-                  className="px-4 py-2 bg-[#9B4000] hover:bg-[#8C4A1E] text-white font-bold rounded-xl shadow-xs transition-all duration-300 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <span>Baca Artikel</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.dispatchEvent(
+                        new CustomEvent("open-ai-chat", {
+                          detail: {
+                            prompt: `Tolong jelaskan analisis inti dan rekomendasi dari berita sorotan "${featuredNews.title}"`,
+                            slug: featuredNews.slug,
+                            article: featuredNews,
+                          },
+                        })
+                      );
+                    }}
+                    className="px-3.5 py-2 bg-[#FFF1E9] hover:bg-[#FFDDC9] text-[#9B4000] font-bold text-xs rounded-xl border border-[#DEC0B3]/60 shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                    title="Tanya AI tentang berita sorotan ini"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-[#9B4000]" />
+                    <span>Tanya AI</span>
+                  </button>
+
+                  <Link
+                    href={`/berita/${featuredNews.slug}`}
+                    className="px-4 py-2 bg-[#9B4000] hover:bg-[#8C4A1E] text-white font-bold rounded-xl shadow-xs transition-all duration-300 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Baca Artikel</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
               </div>
             </div>
 
@@ -587,7 +609,26 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="p-5 pt-0 mt-2 flex items-center justify-between border-t border-[#DEC0B3]/20 pt-4">
-                <span className="text-[11px] text-[#8B7266]">Wawasan Warga</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent("open-ai-chat", {
+                        detail: {
+                          prompt: `Bahas berita "${article.title}" dan jelaskan apa poin pentingnya bagi warga.`,
+                          slug: article.slug,
+                          article: article,
+                        },
+                      })
+                    );
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#FFF1E9] text-[#9B4000] hover:bg-[#FFDDC9] border border-[#DEC0B3]/50 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                  title="Tanya AI tentang berita ini"
+                >
+                  <Sparkles className="w-3 h-3 text-[#9B4000]" />
+                  <span>Tanya AI</span>
+                </button>
+
                 <Link
                   href={`/berita/${article.slug}`}
                   className="text-xs text-[#9B4000] font-bold hover:text-[#8C4A1E] flex items-center gap-1 cursor-pointer"

@@ -13,9 +13,10 @@ import {
     Sparkles,
     FileText,
     ArrowUpRight,
-    ChevronDown,
+    ExternalLink,
 } from "lucide-react";
-import { newsDatabase } from "@/data/news";
+import { newsDatabase, NewsItem } from "@/data/news";
+import { getCombinedNews } from "@/lib/newsService";
 
 interface Message {
     id: string;
@@ -64,7 +65,7 @@ function FormattedContent({ content }: { content: string }) {
                             <Link
                                 key={pIdx}
                                 href={href}
-                                className="inline-flex items-center gap-0.5 font-bold text-[#9B4000] underline underline-offset-2 hover:text-[#724700] hover:bg-[#FFDDC9]/40 px-1 py-0.5 rounded transition-colors"
+                                className="inline-flex items-center gap-0.5 font-bold text-[#9B4000] underline underline-offset-2 hover:text-[#724700] hover:bg-[#FFDDC9]/50 px-1 py-0.5 rounded transition-colors"
                             >
                                 <span>{label}</span>
                                 <ArrowUpRight className="w-3 h-3 inline shrink-0" />
@@ -118,10 +119,25 @@ function AIChatWidgetInner() {
     const [isOpen, setIsOpen] = useState(false);
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [allNews, setAllNews] = useState<NewsItem[]>(newsDatabase);
+    const [customActiveArticle, setCustomActiveArticle] = useState<NewsItem | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    // Muat data berita gabungan secara realtime
+    useEffect(() => {
+        let isMounted = true;
+        getCombinedNews().then((list) => {
+            if (isMounted && list && list.length > 0) {
+                setAllNews(list);
+            }
+        });
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
     // Deteksi apakah user sedang berada di halaman detail berita
-    const currentSlug = useMemo(() => {
+    const pathSlug = useMemo(() => {
         if (pathname && pathname.startsWith("/berita/")) {
             const slug = pathname.replace("/berita/", "").split("/")[0];
             return slug && slug !== "" ? slug : null;
@@ -129,18 +145,19 @@ function AIChatWidgetInner() {
         return null;
     }, [pathname]);
 
-    // Ambil data artikel yang sedang dibaca (jika ada)
-    const currentArticle = useMemo(() => {
-        if (!currentSlug) return null;
-        return newsDatabase.find((n) => n.slug === currentSlug) || null;
-    }, [currentSlug]);
+    // Artikel aktif yang sedang dibahas
+    const activeArticle = useMemo(() => {
+        if (customActiveArticle) return customActiveArticle;
+        if (!pathSlug) return null;
+        return allNews.find((n) => n.slug === pathSlug) || null;
+    }, [customActiveArticle, pathSlug, allNews]);
 
     const initialGreeting = useMemo(() => {
-        if (currentArticle) {
-            return `Halo, Warga! Saya melihat Anda sedang membaca **"${currentArticle.title}"**.\n\nAda yang ingin Anda tanyakan seputar berita ini, atau ingin ringkasan dan analisis dampaknya bagi publik?`;
+        if (activeArticle) {
+            return `Halo, Warga! Saya melihat Anda sedang membuka berita **"${activeArticle.title}"**.\n\nAda yang ingin Anda tanyakan seputar berita ini? Anda bisa meminta ringkasan, analisis dampak bagi warga, atau pihak terkait.`;
         }
         return "Halo, Warga! Saya Asisten AI MelekIsu. Saya siap membantu Anda menganalisis berita, memahami kebijakan publik, atau merangkum isu terkini di portal ini.";
-    }, [currentArticle]);
+    }, [activeArticle]);
 
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -150,7 +167,7 @@ function AIChatWidgetInner() {
         },
     ]);
 
-    // Update salam awal jika berpindah artikel
+    // Update pesan pembuka jika berpindah artikel saat chat masih baru
     useEffect(() => {
         if (messages.length === 1 && messages[0].id === "init") {
             setMessages([
@@ -173,23 +190,11 @@ function AIChatWidgetInner() {
         }
     }, [isOpen, messages, isLoading]);
 
-    // Listener custom event agar tombol mana saja di aplikasi bisa membuka dan bertanya ke AI
-    useEffect(() => {
-        const handleOpenChat = (e: any) => {
-            const detail = e.detail;
-            setIsOpen(true);
-            if (detail && detail.prompt) {
-                sendMessage(detail.prompt);
-            }
-        };
-
-        window.addEventListener("open-ai-chat", handleOpenChat);
-        return () => window.removeEventListener("open-ai-chat", handleOpenChat);
-    }, [messages, currentSlug]);
-
-    const sendMessage = async (textToSend: string) => {
+    const sendMessage = async (textToSend: string, targetArticle?: NewsItem | null) => {
         const text = textToSend.trim();
         if (!text || isLoading) return;
+
+        const effectiveArticle = targetArticle !== undefined ? targetArticle : activeArticle;
 
         const userMsg: Message = {
             id: `usr-${Date.now()}`,
@@ -212,7 +217,8 @@ function AIChatWidgetInner() {
                         sender: m.sender,
                         text: m.text,
                     })),
-                    currentSlug: currentSlug,
+                    currentSlug: effectiveArticle?.slug || pathSlug,
+                    currentArticle: effectiveArticle,
                 }),
             });
 
@@ -239,12 +245,38 @@ function AIChatWidgetInner() {
         }
     };
 
+    // Listener custom event agar tombol mana saja di aplikasi bisa membuka dan bertanya ke AI
+    useEffect(() => {
+        const handleOpenChat = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            setIsOpen(true);
+
+            let chosenArticle: NewsItem | null = null;
+            if (detail && detail.article) {
+                chosenArticle = detail.article;
+                setCustomActiveArticle(detail.article);
+            } else if (detail && detail.slug) {
+                const found = allNews.find((n) => n.slug === detail.slug) || null;
+                chosenArticle = found;
+                if (found) setCustomActiveArticle(found);
+            }
+
+            if (detail && detail.prompt) {
+                sendMessage(detail.prompt, chosenArticle);
+            }
+        };
+
+        window.addEventListener("open-ai-chat", handleOpenChat);
+        return () => window.removeEventListener("open-ai-chat", handleOpenChat);
+    }, [allNews, activeArticle, pathSlug, messages, isLoading]);
+
     const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         sendMessage(input);
     };
 
     const handleClearChat = () => {
+        setCustomActiveArticle(null);
         setMessages([
             {
                 id: `init-${Date.now()}`,
@@ -256,11 +288,12 @@ function AIChatWidgetInner() {
 
     // Pertanyaan rekomendasi cepat (chips)
     const quickPrompts = useMemo(() => {
-        if (currentArticle) {
+        if (activeArticle) {
             return [
                 "Ringkas berita ini",
-                "Apa manfaat bagi warga?",
+                "Apa dampak bagi warga?",
                 "Siapa pihak terkait di berita ini?",
+                "Saran tanggapan warga yang solutif",
             ];
         }
         return [
@@ -268,8 +301,9 @@ function AIChatWidgetInner() {
             "Kebijakan pupuk subsidi",
             "Transit nol emisi 2025",
             "Satu data anggaran terbuka",
+            "Rekomendasi isu hangat",
         ];
-    }, [currentArticle]);
+    }, [activeArticle]);
 
     return (
         <div className="fixed bottom-6 right-6 z-50">
@@ -287,7 +321,7 @@ function AIChatWidgetInner() {
                     <div className="flex flex-col text-left">
                         <span className="text-xs font-bold leading-tight">Tanya Asisten AI</span>
                         <span className="text-[10px] text-[#FFDDC9] font-medium opacity-90 group-hover:opacity-100">
-                            {currentArticle ? "Tanya artikel ini" : "Terintegrasi Berita"}
+                            {activeArticle ? "Tanya artikel ini" : "Terintegrasi Berita"}
                         </span>
                     </div>
                 </button>
@@ -295,7 +329,7 @@ function AIChatWidgetInner() {
 
             {/* Jendela Kotak Chat */}
             {isOpen && (
-                <div className="w-[340px] sm:w-[410px] h-[560px] bg-white rounded-3xl shadow-2xl border border-[#DEC0B3]/60 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="w-[340px] sm:w-[420px] h-[580px] bg-white rounded-3xl shadow-2xl border border-[#DEC0B3]/60 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
 
                     {/* Header Chat */}
                     <div className="bg-gradient-to-r from-[#9B4000] via-[#8C4A1E] to-[#723B18] text-white p-3.5 sm:p-4 flex items-center justify-between shadow-md">
@@ -340,17 +374,21 @@ function AIChatWidgetInner() {
                     </div>
 
                     {/* Banner Konteks Artikel yang Sedang Dibaca (Jika ada) */}
-                    {currentArticle && (
+                    {activeArticle && (
                         <div className="bg-[#FFF1E9] border-b border-[#DEC0B3]/60 px-3.5 py-2 flex items-center justify-between gap-2 text-xs">
                             <div className="flex items-center gap-2 min-w-0">
                                 <FileText className="w-3.5 h-3.5 text-[#9B4000] shrink-0" />
                                 <p className="truncate text-[11px] font-semibold text-[#574238]">
-                                    <span className="text-[#9B4000] font-bold">Sedang Dibaca:</span> {currentArticle.title}
+                                    <span className="text-[#9B4000] font-bold">Sedang Membahas:</span> {activeArticle.title}
                                 </p>
                             </div>
-                            <span className="text-[9.5px] bg-[#9B4000]/10 text-[#9B4000] font-bold px-1.5 py-0.5 rounded shrink-0">
-                                Aktif
-                            </span>
+                            <button
+                                onClick={() => setCustomActiveArticle(null)}
+                                className="text-[9.5px] bg-[#9B4000]/10 hover:bg-[#9B4000]/20 text-[#9B4000] font-bold px-1.5 py-0.5 rounded shrink-0 cursor-pointer transition-colors"
+                                title="Bebaskan konteks untuk tanya berita lain"
+                            >
+                                Semua Berita ✕
+                            </button>
                         </div>
                     )}
 
@@ -407,9 +445,9 @@ function AIChatWidgetInner() {
                     </div>
 
                     {/* Chips Rekomendasi Pertanyaan Cepat */}
-                    <div className="bg-white/90 border-t border-[#DEC0B3]/30 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                    <div className="bg-white/95 border-t border-[#DEC0B3]/40 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                         <span className="text-[10px] text-[#8B7266] font-bold shrink-0 flex items-center gap-1">
-                            <Sparkles className="w-3 h-3 text-[#9B4000]" /> Tanya:
+                            <Sparkles className="w-3 h-3 text-[#9B4000]" /> Cepat:
                         </span>
                         {quickPrompts.map((prompt, idx) => (
                             <button
@@ -431,8 +469,8 @@ function AIChatWidgetInner() {
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             placeholder={
-                                currentArticle
-                                    ? "Tanya seputar berita ini..."
+                                activeArticle
+                                    ? `Tanya berita "${activeArticle.title.slice(0, 25)}..."`
                                     : "Tanya seputar berita, kebijakan publik..."
                             }
                             disabled={isLoading}

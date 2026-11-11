@@ -605,13 +605,35 @@ function BeritaContent() {
                                             </button>
                                         </div>
 
-                                        <Link
-                                            href={`/berita/${article.slug}`}
-                                            className="text-xs text-[#9B4000] font-bold hover:text-[#8C4A1E] flex items-center gap-1"
-                                        >
-                                            <span>Baca</span>
-                                            <ArrowRight className="w-3.5 h-3.5" />
-                                        </Link>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    window.dispatchEvent(
+                                                        new CustomEvent("open-ai-chat", {
+                                                            detail: {
+                                                                prompt: `Tolong jelaskan inti dari berita "${article.title}" dan apa dampaknya bagi masyarakat.`,
+                                                                slug: article.slug,
+                                                                article: article,
+                                                            },
+                                                        })
+                                                    );
+                                                }}
+                                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#FFF1E9] text-[#9B4000] hover:bg-[#FFDDC9] border border-[#DEC0B3]/50 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                                title="Tanya Asisten AI tentang berita ini"
+                                            >
+                                                <Sparkles className="w-3 h-3 text-[#9B4000]" />
+                                                <span>Tanya AI</span>
+                                            </button>
+
+                                            <Link
+                                                href={`/berita/${article.slug}`}
+                                                className="text-xs text-[#9B4000] font-bold hover:text-[#8C4A1E] flex items-center gap-1"
+                                            >
+                                                <span>Baca</span>
+                                                <ArrowRight className="w-3.5 h-3.5" />
+                                            </Link>
+                                        </div>
                                     </div>
                                 </article>
                             );
